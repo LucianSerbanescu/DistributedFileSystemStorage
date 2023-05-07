@@ -21,7 +21,7 @@ public class Communicator {
     public String receiveAnyMessage(String[] splittedMessage) throws IOException {
 
         return switch (splittedMessage[0]) {
-            case "STORE", "REMOVE", "LOAD", "LIST" -> ("CLIENT");
+            case"STORE", "REMOVE", "LOAD", "LIST" -> ("CLIENT");
             default -> ("NOT CLIENT");
         };
 

@@ -1,20 +1,31 @@
 import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class Index {
 
-    protected HashMap<String,String> index;
+    protected ConcurrentHashMap<String,String> index;
 
     public Index() {
-        index = new HashMap<>();
+        index = new ConcurrentHashMap<>();
     }
 
-    public void store(String filename, String message) {
-        index.put(filename,message);
-        System.out.println(index.get("file1"));
+//    public void storeInProgress(String filename) {
+//        index.put(filename,"store in progress");
+//    }
+
+    public String getFileProgress(String filename) {
+        return index.get(filename);
     }
 
-    public void updateIndexStatus(String filename, String status) {
+    public boolean storeInProgress(String fileName) {
+        if (index.putIfAbsent(fileName, "STORE_IN_PROGRESS") == null) {
+            return true;
+        }
+        return false;
+    }
 
+    public void updateIndexStatus(String filename) {
+        index.put(filename,"STORE_COMPLETED");
     }
 
 }

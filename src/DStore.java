@@ -21,7 +21,6 @@ public class DStore {
 
     private File fileFolder;
 
-    // TODO : need to add the file path in parameter
     public DStore(int port, int cport, int timeout, String file_folder) throws IOException {
 
         fileSizeMap = new HashMap<>();
@@ -35,8 +34,6 @@ public class DStore {
         } catch (UnknownHostException e) {
             throw new RuntimeException(e);
         }
-
-        //TODO try to close all the Dstores when the controller is closed
 
         connectController(localAddress, cport, port);
         openServerSocketForClient(port);
@@ -80,7 +77,6 @@ public class DStore {
 
     }
 
-    // TODO rewrite this class
     public synchronized void handleClientConnection(Socket clientConnection) throws IOException {
 
         BufferedReader in = new BufferedReader(
@@ -92,7 +88,9 @@ public class DStore {
         while((line = in.readLine()) != null) {
             System.out.println("message received : " + line);
             String[] splittedMessage = line.split(" ");
+
             switch (splittedMessage[0]) {
+
                 case Protocol.STORE_TOKEN :
                     fileSizeMap.put(splittedMessage[1], Integer.valueOf(splittedMessage[2]));
                     communicator.sendMessage(clientConnection,Protocol.ACK_TOKEN);
@@ -100,6 +98,7 @@ public class DStore {
                     // notice that the connection to the controller is done in way before and stored in a class variable
                     communicator.sendMessage(controllerConnection,Protocol.STORE_ACK_TOKEN + " " + splittedMessage[1]);
                     break;
+
                 case Protocol.LOAD_TOKEN :
 
                 default :
@@ -107,28 +106,10 @@ public class DStore {
             }
         }
 
-
-
-
-
-        //communicator.listenAndDisplayToTerminal(clientConnection);
-        // TODO check what kind of message is received and from who and treat it appropriately
-
-
-
-        // TODO receive the STORE filename filesize command
-        // then send this   communicator.sendMessage(clientConnection,Protocol.ACK_TOKEN); back to the client
-        // then actually store the file
-             // then send to Controller a message back that the file is stored
-
-        // NOTE : after all this the controller send a message to the client as well
-
-
     }
 
 
 
-    // TODO rewrite this class
     public void storeFile(Socket connection,String fileName) throws IOException {
 
         InputStream in = connection.getInputStream();

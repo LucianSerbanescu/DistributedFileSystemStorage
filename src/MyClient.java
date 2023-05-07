@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.*;
+import java.util.ArrayList;
 import java.util.Objects;
 
 public class MyClient {
@@ -12,29 +13,36 @@ public class MyClient {
     //add a buffer receiver to the client
     public MyClient(int cport, int timeout) throws SocketException {
 
-        //communicator = new Communicator();
+        String fileName = "file1.txt";
+        int fileSize = 100;
 
-        //callController(cport);
-        //callController(connection);
-
-        //callController(cport);
-        callDstore(2333);
+        callControllerTest1(cport, fileName, fileSize);
+        //callDstore(2333);
     }
 
-    public void callController(int cport) {
+    public void callControllerTest1(int cport, String fileName, int fileSize) {
 
         try{
             // create connection
             InetAddress localAddress = InetAddress.getLocalHost();
             Socket connection = new Socket(localAddress,cport);
 
-            sendMessage(connection, Protocol.STORE_TOKEN + " file1 100");
-            listenMessagesFromController(connection);
-            // TODO after receiving the message form controller pass the ports to make the connection
-        }catch(Exception e){System.out.println("error"+e);}
+            sendMessage(connection, Protocol.STORE_TOKEN + " " + fileName + " " + fileSize);
+
+            ArrayList<Integer> allDstoresPorts = listenForAllDstoresPorts(connection);
+
+            for (Integer allDstoresPort : allDstoresPorts) {
+                callDstore(allDstoresPort);
+            }
+
+            listenStoreComplete(connection);
+
+
+        }catch(Exception e){
+            System.out.println("error"+e);
+        }
 
             System.out.println("MESSAGES " + " sent");
-            //Thread.sleep(1000);
     }
 
     public void callDstore(int port) {
@@ -59,7 +67,6 @@ public class MyClient {
                             File inputFile = new File(messageSplitted[1]);
                             sendFile(dstoreConnection,inputFile);
                             break;
-                            // TODO : Wait for the STORE COMPLETE message form controller after all R dstores have saved the file
                         }
                         //System.out.println(line + " received");
                     }
@@ -102,37 +109,47 @@ public class MyClient {
         }
     }
 
-    public void listenMessagesFromController(Socket connection) {
-        // new thread for listening to the controllers messages
-        new Thread(() -> {
+    public ArrayList<Integer> listenForAllDstoresPorts(Socket connection) {
 
-            BufferedReader in = null;
-            try {
-                in = new BufferedReader(
-                        new InputStreamReader(connection.getInputStream())
-                );
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-            String line;
+        ArrayList<Integer> allPorts = new ArrayList<>();
 
-            // listens until decide who made the connection
+        try {
+            BufferedReader in = new BufferedReader(
+                    new InputStreamReader(connection.getInputStream())
+            );
             while(true) {
-                try {
-                    if ((line = in.readLine()) == null){
-                        if(line.split(" ")[0] == Protocol.STORE_TO_TOKEN){
-                            callDstore(Integer.parseInt(line.split(" ")[1]));
-                            break;
-                        }
+                String line;
+                if (Objects.equals(((line = in.readLine())).split(" ")[0], Protocol.STORE_TO_TOKEN)) {
+                    System.out.println(line);
+                    for (int i = 1; i < line.split(" ").length; i++) {
+                        //System.out.println(line.split(" ")[i]);
+                        allPorts.add(Integer.parseInt(line.split(" ")[i]));
                     }
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
+                    break;
                 }
-                System.out.println(line + " received");
-                //String[] splittedMessage = line.split(" ");
             }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return allPorts;
+    }
 
-        }).start();
+    public void listenStoreComplete(Socket connection) {
+
+        try {
+            BufferedReader in = new BufferedReader(
+                    new InputStreamReader(connection.getInputStream())
+            );
+            while(true) {
+                String line;
+                if (Objects.equals(((line = in.readLine())).split(" ")[0], Protocol.STORE_COMPLETE_TOKEN)) {
+                    System.out.println(line);
+                    break;
+                }
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
 

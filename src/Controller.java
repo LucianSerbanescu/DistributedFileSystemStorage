@@ -21,74 +21,92 @@ public class Controller {
         this.index = new Index();
         this.dstorePortsList = new ArrayList<>();
 
-        openDStoreConnection(cport);
+        openServerSocket(cport);
 
     }
 
-    public void openDStoreConnection(int cport) {
-        // open server socket
-        //communicator.openServerSocket(serverSocket,cport);
-        // the for keeps the connection open
+    public void openServerSocket(int cport) {
+
+        System.out.println("waiting for R dstores to connect");
         for(;;){
             try (ServerSocket serverSocket = new ServerSocket(cport)) {
-                System.out.println("waiting for connection");
                 Socket connection = serverSocket.accept();
-                new Thread(() -> {
-                    try {
-                        this.handleNewConnection(connection);
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                }).start();
-                //connection.close();
-            }catch(Exception e){System.out.println("error " + e);}
-        }
-    }
-
-    public void handleNewConnection (Socket connection) throws IOException {
-
-        BufferedReader in = new BufferedReader(
-                new InputStreamReader(connection.getInputStream())
-        );
-
-        String line;
-        while((line = in.readLine()) != null) {
-            String[] splittedMessage = line.split(" ");
-            int port = Integer.parseInt(splittedMessage[1]);
-            if (splittedMessage[0].equals("JOIN")) {
-                handleDstoreConnection(connection,port);
-                break;
-            } else {
-                if(dstorePortsList.size() >= R) {
-                    if (communicator.receiveAnyMessage(splittedMessage).equals("CLIENT")){
-                        receiveClientMessage(splittedMessage, connection);
+                BufferedReader in = new BufferedReader(
+                        new InputStreamReader(connection.getInputStream())
+                );
+                String line;
+                while((line = in.readLine()) != null) {
+                    String[] splittedMessage = line.split(" ");
+                    if (splittedMessage[0].equals("JOIN")) {
+                        int port = Integer.parseInt(splittedMessage[1]);
+                        dstorePortsList.add(port);
+                        System.out.println(port + " joined");
+                        new Thread(() -> {
+                            try {
+                                // just listen and keep the connection open
+                                handleDstoreConnection(connection);
+                                System.out.println("Dstore " + port + " disconnected");
+                                dstorePortsList.remove(port);
+                            } catch (IOException e) {
+                             throw new RuntimeException(e);
+                            }
+                        }).start();
+                        // don't listen because we know it is a dstore
                         break;
+                    } else {
+                        if(dstorePortsList.size() >= R) {
+                            if (communicator.receiveAnyMessage(splittedMessage).equals("CLIENT")){
+                                handleClientMessage(splittedMessage, connection);
+                                break;
+                            }
+                        } else {
+                            System.out.println("NOT ENOUGHT DSTORES");
+                            communicator.sendMessage(connection,"NOT ENOUGHT DSTORES");
+                            connection.close();
+                        }
                     }
-                } else {
-                    System.out.println("NOT ENOUGHT DSTORES");
-                    communicator.sendMessage(connection,"NOT ENOUGHT DSTORES");
-                    connection.close();
                 }
-            }
+
+            }catch(Exception e){ System.out.println("error " + e); }
         }
+
     }
 
-    public void receiveClientMessage (String[] splittedMessage,Socket connection) throws IOException {
+    public void handleClientMessage(String[] splittedMessage, Socket connection) throws IOException, InterruptedException {
 
         switch (splittedMessage[0]) {
 
-            case "STORE":
-                index.store(splittedMessage[1], Protocol.STORE_COMPLETE_TOKEN);
+            case "STORE" -> {
+                index.storeInProgress(splittedMessage[1]);
                 handleStore(connection);
-            case "LOAD":
+                Thread.sleep(1000);
+                checkStoredFinished();
+                // TODO need to check if they are actually completed
+                communicator.sendMessage(connection,Protocol.STORE_COMPLETE_TOKEN);
+            }
 
-            case "LIST":
+            case "LOAD" -> {
 
-            case "REMOVE":
+            }
 
-            default:
-                //return ("Error, it parssed : " + splittedMessage[0]);
+            case "LIST" -> {
+
+            }
+
+            case "REMOVE"-> {
+
+            }
+
+            default -> {
+
+            }
         }
+
+    }
+
+    private void checkStoredFinished() {
+
+
 
     }
 
@@ -103,54 +121,36 @@ public class Controller {
             }
         }
         communicator.sendMessage(connection,Protocol.STORE_TO_TOKEN + " " + storeToList);
-        listenFromDstore(connection);
     }
 
 
-    public void handleDstoreConnection(Socket connection, Integer port) throws IOException {
+    public void handleDstoreConnection(Socket connection) throws IOException {
 
-        System.out.println(port + " joined");
-        dstorePortsList.add(port);
-        BufferedReader in = new BufferedReader(
-                new InputStreamReader(connection.getInputStream()));
-        String line;
-        // ?
-        while((line = in.readLine()) != null) {
-            //System.out.println(line + " is the second message received");
-            if (line.equals(Protocol.STORE_ACK_TOKEN)) {
-                index.updateIndexStatus(line.split(" ")[1],Protocol.STORE_COMPLETE_TOKEN);
-                // TODO Check if all R Dstores have received the file
-                // TODO Then send the message to the client that the connection is completed
-            }
-        }
-        dstorePortsList.remove(port);
-        System.out.println("Dstore " + port + " disconnected");
-    }
+        try {
+            BufferedReader in = new BufferedReader(
+                    new InputStreamReader(connection.getInputStream())
+            );
+            String line;
+            while ((line = in.readLine()) != null) {
+                switch (line.split(" ")[0]) {
+                    case Protocol.STORE_ACK_TOKEN ->  {
+                        index.updateIndexStatus(line.split(" ")[1]);
 
-    public synchronized void listenFromDstore(Socket connection) {
-        // new thread for listening to the controllers messages
-        new Thread(() -> {
-            try {
-                BufferedReader in = null;
-                in = new BufferedReader(
-                        new InputStreamReader(connection.getInputStream())
-                );
-                String line;
-                // TODO this looks strange
-                while ((line = in.readLine()) != null) {
-                    System.out.println(line + " received");
-                    if (line.split(" ")[0].equals(Protocol.STORE_ACK_TOKEN)) {
-                        index.updateIndexStatus(line.split(" ")[1],Protocol.STORE_COMPLETE_TOKEN);
-                    } else {
-                        // TODO change this message
-                        System.out.println("Error produced in listening if the file has been stored");
+                    }
+                    case Protocol.LOAD_TOKEN ->  {
+
+                    }
+                    default -> {
+                        System.out.println(line.split(" ")[0]);
+                        System.out.println("I didn't received the STORE_ACK message");
+                    }
                     }
                 }
-            } catch (IOException e) {
-                System.out.println("Error produced in listening if the file has been stored");
-                throw new RuntimeException(e);
-            }
-        }).start();
+        } catch (IOException e) {
+            System.out.println("Error produced in listening if the file has been stored");
+            throw new RuntimeException(e);
+        }
+
     }
 
     public static void main(String[] args){
@@ -165,6 +165,7 @@ public class Controller {
             Controller controller = new Controller(cPort, r, timeout, rebalancePeriod);
         }
         catch(Exception e){
+            e.printStackTrace();
             System.out.println("Unable to create Controller.");
         }
     }
