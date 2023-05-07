@@ -1,4 +1,3 @@
-import javax.naming.ldap.SortKey;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -8,10 +7,6 @@ import java.net.Socket;
     // Communicator class is responale for keeping the sockets and passoing the messages
 
 public class Communicator {
-
-    public Communicator() {
-
-    }
 
     public synchronized void sendMessage(Socket connection , String message) {
 
@@ -23,15 +18,7 @@ public class Communicator {
         }
     }
 
-    public void sleep() {
-        try {
-            Thread.sleep(1000);
-        } catch (Exception e) {
-            System.out.println("cant sleep");
-        }
-    }
-
-    public synchronized void listenMessagesThread (Socket connection) {
+    public synchronized void listenAndDisplayToTerminal(Socket connection) {
         // new thread for listening to the controllers messages
         new Thread(() -> {
             BufferedReader in = null;
@@ -52,13 +39,9 @@ public class Communicator {
                     throw new RuntimeException(e);
                 }
                 System.out.println(line + " received");
-                //String[] splittedMessage = line.split(" ");
             }
-
         }).start();
     }
-
-
 
 }
 

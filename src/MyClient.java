@@ -1,11 +1,9 @@
-import javax.naming.ldap.SortKey;
 import java.io.*;
 import java.net.*;
-import java.sql.Connection;
 
 public class MyClient {
 
-    private Communicator communicator;
+    //private Communicator communicator;
     private Socket connection;
     //protected Client client;
     //protected Logger.LoggingType logger;
@@ -13,7 +11,7 @@ public class MyClient {
     //add a buffer receiver to the client
     public MyClient(int cport, int timeout) throws SocketException {
 
-        communicator = new Communicator();
+        //communicator = new Communicator();
 
         //callController(cport);
         //callController(connection);
@@ -29,8 +27,8 @@ public class MyClient {
             InetAddress localAddress = InetAddress.getLocalHost();
             Socket connection = new Socket(localAddress,cport);
 
-            communicator.sendMessage(connection,Protocol.STORE_TOKEN + " file1 100");
-            listenMessagesThread(connection);
+            sendMessage(connection, Protocol.STORE_TOKEN + " file1 100");
+            listenMessages(connection);
             // TODO after receiving the message form controller pass the ports to make the connection
         }catch(Exception e){System.out.println("error"+e);}
 
@@ -38,8 +36,65 @@ public class MyClient {
             //Thread.sleep(1000);
     }
 
+    public void callDstore(int port) {
+        try{
+            // get the local host
+            InetAddress localAddress = InetAddress.getLocalHost();
+            Socket dstoreConnection = new Socket(localAddress,port);
 
-    public void listenMessagesThread (Socket connection) {
+            //communicator.sendMessage(dstoreConnection,Protocol.STORE_TOKEN + " file1 100");
+            String[] message = (Protocol.STORE_TOKEN + " file2.png 100").split(" ");
+
+            sendFile(dstoreConnection,message);
+
+            System.out.println("back in callDstore method");
+            //System.out.println(Protocol.STORE_TOKEN + " file1 100" + " sent");
+
+            // for this to work you need an open connection
+            // listenMessagesThread(dstoreConnection);
+
+        }catch(Exception e){System.out.println("Error in callDstore");}
+    }
+
+    public void sendFile(Socket dstoreConnection, String[] message) {
+        System.out.println("send message : " + message[0]+" "+message[1]+" "+message[2]);
+        if(message[0].equals(Protocol.STORE_TOKEN)){
+            File inputFile = new File(message[1]);
+            try {
+                FileInputStream in = new FileInputStream(inputFile);
+                //System.out.println("gets here");
+                try{
+                    OutputStream out = dstoreConnection.getOutputStream();
+                    //out.write(("STORE"+" "+message[1]+" ").getBytes());
+                    out.write(("STORE"+" "+"newimage" + " ").getBytes());
+                    byte[] buf = new byte[1000]; int buflen;
+                    while ((buflen=in.read(buf)) != -1){
+                        System.out.print("*");
+                        out.write(buf,0,buflen);
+                    }
+                    //close connection
+                    out.close();
+                }catch(Exception e){System.out.println("error"+e);}
+                System.out.println();
+                //close connection
+                in.close();
+            } catch (Exception e) {
+                System.out.println(e);
+            }
+        }
+    }
+
+    public synchronized void sendMessage(Socket connection , String message) {
+
+        try {
+            PrintWriter out = new PrintWriter(connection.getOutputStream());
+            out.println(message); out.flush();
+        } catch (IOException e) {
+            System.out.println("error in sendMessage");
+        }
+    }
+
+    public void listenMessages(Socket connection) {
         // new thread for listening to the controllers messages
         new Thread(() -> {
 
@@ -72,53 +127,7 @@ public class MyClient {
         }).start();
     }
 
-    public void callDstore(int port) {
-        try{
-            // get the local host
-            InetAddress localAddress = InetAddress.getLocalHost();
-            Socket dstoreConnection = new Socket(localAddress,port);
 
-            //communicator.sendMessage(dstoreConnection,Protocol.STORE_TOKEN + " file1 100");
-            String[] message = (Protocol.STORE_TOKEN + " file2.png 100").split(" ");
-
-            sendFile(dstoreConnection, communicator,message);
-
-            System.out.println("back in callDstore method");
-            //System.out.println(Protocol.STORE_TOKEN + " file1 100" + " sent");
-
-            // for this to work you need an open connection
-            // listenMessagesThread(dstoreConnection);
-
-        }catch(Exception e){System.out.println("Error in callDstore");}
-    }
-
-    public void sendFile(Socket dstoreConnection, Communicator communicator, String[] message) {
-        System.out.println("send message : " + message[0]+" "+message[1]+" "+message[2]);
-        if(message[0].equals(Protocol.STORE_TOKEN)){
-            File inputFile = new File(message[1]);
-            try {
-                FileInputStream in = new FileInputStream(inputFile);
-                //System.out.println("gets here");
-                try{
-                    OutputStream out = dstoreConnection.getOutputStream();
-                    //out.write(("STORE"+" "+message[1]+" ").getBytes());
-                    out.write(("STORE"+" "+"newimage" + " ").getBytes());
-                    byte[] buf = new byte[1000]; int buflen;
-                    while ((buflen=in.read(buf)) != -1){
-                        System.out.print("*");
-                        out.write(buf,0,buflen);
-                    }
-                    //close connection
-                    out.close();
-                }catch(Exception e){System.out.println("error"+e);}
-                System.out.println();
-                //close connection
-                in.close();
-            } catch (Exception e) {
-                System.out.println(e);
-            }
-        }
-    }
 
     public static void main(String[] args) {
 
