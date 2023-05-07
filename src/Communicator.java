@@ -18,6 +18,15 @@ public class Communicator {
         }
     }
 
+    public String receiveAnyMessage(String[] splittedMessage) throws IOException {
+
+        return switch (splittedMessage[0]) {
+            case "STORE", "REMOVE", "LOAD", "LIST" -> ("CLIENT");
+            default -> ("NOT CLIENT");
+        };
+
+    }
+
     public synchronized void listenAndDisplayToTerminal(Socket connection) {
         // new thread for listening to the controllers messages
         new Thread(() -> {

@@ -60,7 +60,7 @@ public class Controller {
                 break;
             } else {
                 if(dstorePortsList.size() >= R) {
-                    if (receiveAnyMessage(splittedMessage).equals("CLIENT")){
+                    if (communicator.receiveAnyMessage(splittedMessage).equals("CLIENT")){
                         receiveClientMessage(splittedMessage, connection);
                         break;
                     }
@@ -71,16 +71,6 @@ public class Controller {
                 }
             }
         }
-    }
-
-
-    public String receiveAnyMessage(String[] splittedMessage) throws IOException {
-
-        return switch (splittedMessage[0]) {
-            case "STORE", "REMOVE", "LOAD", "LIST" -> ("CLIENT");
-            default -> ("NOT CLIENT");
-        };
-
     }
 
     public void receiveClientMessage (String[] splittedMessage,Socket connection) throws IOException {
@@ -121,12 +111,17 @@ public class Controller {
 
         System.out.println(port + " joined");
         dstorePortsList.add(port);
-        //System.out.println(dstorePortsList.get(0));
         BufferedReader in = new BufferedReader(
                 new InputStreamReader(connection.getInputStream()));
         String line;
+        // ?
         while((line = in.readLine()) != null) {
-            System.out.println(line + " is the second message received");
+            //System.out.println(line + " is the second message received");
+            if (line.equals(Protocol.STORE_ACK_TOKEN)) {
+                index.updateIndexStatus(line.split(" ")[1],Protocol.STORE_COMPLETE_TOKEN);
+                // TODO Check if all R Dstores have received the file
+                // TODO Then send the message to the client that the connection is completed
+            }
         }
         dstorePortsList.remove(port);
         System.out.println("Dstore " + port + " disconnected");

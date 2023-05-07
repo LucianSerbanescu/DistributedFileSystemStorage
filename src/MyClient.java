@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.*;
+import java.util.Objects;
 
 public class MyClient {
 
@@ -28,7 +29,7 @@ public class MyClient {
             Socket connection = new Socket(localAddress,cport);
 
             sendMessage(connection, Protocol.STORE_TOKEN + " file1 100");
-            listenMessages(connection);
+            listenMessagesFromController(connection);
             // TODO after receiving the message form controller pass the ports to make the connection
         }catch(Exception e){System.out.println("error"+e);}
 
@@ -38,49 +39,56 @@ public class MyClient {
 
     public void callDstore(int port) {
         try{
-            // get the local host
+
             InetAddress localAddress = InetAddress.getLocalHost();
             Socket dstoreConnection = new Socket(localAddress,port);
 
-            //communicator.sendMessage(dstoreConnection,Protocol.STORE_TOKEN + " file1 100");
-            String[] message = (Protocol.STORE_TOKEN + " file2.png 100").split(" ");
+            String messageString = (Protocol.STORE_TOKEN + " file1.txt 101");
+            String[] messageSplitted = messageString.split(" ");
 
-            sendFile(dstoreConnection,message);
+            sendMessage(dstoreConnection,messageString);
 
-            System.out.println("back in callDstore method");
-            //System.out.println(Protocol.STORE_TOKEN + " file1 100" + " sent");
-
-            // for this to work you need an open connection
-            // listenMessagesThread(dstoreConnection);
+            new Thread(() -> {
+                try {
+                    BufferedReader in = new BufferedReader(
+                            new InputStreamReader(dstoreConnection.getInputStream())
+                    );
+                    while(true) {
+                        String line;
+                        if (Objects.equals(line = in.readLine(), Protocol.ACK_TOKEN)){
+                            File inputFile = new File(messageSplitted[1]);
+                            sendFile(dstoreConnection,inputFile);
+                            break;
+                            // TODO : Wait for the STORE COMPLETE message form controller after all R dstores have saved the file
+                        }
+                        //System.out.println(line + " received");
+                    }
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }).start();
 
         }catch(Exception e){System.out.println("Error in callDstore");}
     }
 
-    public void sendFile(Socket dstoreConnection, String[] message) {
-        System.out.println("send message : " + message[0]+" "+message[1]+" "+message[2]);
-        if(message[0].equals(Protocol.STORE_TOKEN)){
-            File inputFile = new File(message[1]);
-            try {
-                FileInputStream in = new FileInputStream(inputFile);
-                //System.out.println("gets here");
-                try{
-                    OutputStream out = dstoreConnection.getOutputStream();
-                    //out.write(("STORE"+" "+message[1]+" ").getBytes());
-                    out.write(("STORE"+" "+"newimage" + " ").getBytes());
-                    byte[] buf = new byte[1000]; int buflen;
-                    while ((buflen=in.read(buf)) != -1){
-                        System.out.print("*");
-                        out.write(buf,0,buflen);
-                    }
-                    //close connection
-                    out.close();
-                }catch(Exception e){System.out.println("error"+e);}
-                System.out.println();
+    public void sendFile(Socket dstoreConnection, File inputFile) {
+        try {
+            FileInputStream in = new FileInputStream(inputFile);
+            try{
+                OutputStream out = dstoreConnection.getOutputStream();
+                byte[] buf = new byte[1000]; int buflen;
+                while ((buflen=in.read(buf)) != -1){
+                    System.out.print("*");
+                    out.write(buf,0,buflen);
+                }
                 //close connection
-                in.close();
-            } catch (Exception e) {
-                System.out.println(e);
-            }
+                out.close();
+            }catch(Exception e){System.out.println("error"+e);}
+            //System.out.println();
+            //close connection
+            in.close();
+        } catch (Exception e) {
+            System.out.println(e);
         }
     }
 
@@ -94,7 +102,7 @@ public class MyClient {
         }
     }
 
-    public void listenMessages(Socket connection) {
+    public void listenMessagesFromController(Socket connection) {
         // new thread for listening to the controllers messages
         new Thread(() -> {
 
