@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.*;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Objects;
 
@@ -8,26 +9,33 @@ public class MyClient {
     //private Communicator communicator;
     private Socket connection;
     //protected Client client;
-    //protected Logger.LoggingType logger;
+    //private Logger.LoggingType logger;
 
     //add a buffer receiver to the client
-    public MyClient(int cport, int timeout) throws SocketException {
+    public MyClient(int cport, int timeout) throws IOException {
 
-        String fileName = "file1.txt";
+        String filename = "file1.txt";
+
         int fileSize = 100;
 
-        callControllerTest1(cport, fileName, fileSize);
-        //callDstore(2333);
+        //Client client = new Client(cport,timeout,logger);
+
+        //client.store(new File(filename));
+
+        callControllerTest1(cport, filename, fileSize);
+
+
+
     }
 
-    public void callControllerTest1(int cport, String fileName, int fileSize) {
+    public void callControllerTest1(int cport, String filename, int fileSize) {
 
         try{
             // create connection
             InetAddress localAddress = InetAddress.getLocalHost();
             Socket connection = new Socket(localAddress,cport);
 
-            sendMessage(connection, Protocol.STORE_TOKEN + " " + fileName + " " + fileSize);
+            sendMessage(connection, Protocol.STORE_TOKEN + " " + filename + " " + fileSize);
 
             ArrayList<Integer> allDstoresPorts = listenForAllDstoresPorts(connection);
 
@@ -51,7 +59,7 @@ public class MyClient {
             InetAddress localAddress = InetAddress.getLocalHost();
             Socket dstoreConnection = new Socket(localAddress,port);
 
-            String messageString = (Protocol.STORE_TOKEN + " file1.txt 101");
+            String messageString = (Protocol.STORE_TOKEN + " to_store.txt 101");
             String[] messageSplitted = messageString.split(" ");
 
             sendMessage(dstoreConnection,messageString);
@@ -126,6 +134,9 @@ public class MyClient {
                         allPorts.add(Integer.parseInt(line.split(" ")[i]));
                     }
                     break;
+                } else {
+                    System.out.println(line);
+                    break;
                 }
             }
         } catch (IOException e) {
@@ -143,6 +154,12 @@ public class MyClient {
             while(true) {
                 String line;
                 if (Objects.equals(((line = in.readLine())).split(" ")[0], Protocol.STORE_COMPLETE_TOKEN)) {
+                    System.out.println(line);
+                    break;
+                } else if (Objects.equals(((line = in.readLine())).split(" ")[0], Protocol.ERROR_FILE_ALREADY_EXISTS_TOKEN)) {
+                    System.out.println(line);
+                    break;
+                } else if (Objects.equals(((line = in.readLine())).split(" ")[0], Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN)) {
                     System.out.println(line);
                     break;
                 }

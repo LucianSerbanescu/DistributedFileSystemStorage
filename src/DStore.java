@@ -4,6 +4,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.HashMap;
+import java.util.concurrent.CountDownLatch;
 
 public class DStore {
 
@@ -13,17 +14,16 @@ public class DStore {
     private String getFile_folder;
     private String file_folder;
     private ServerSocket dstoreSocket;
+    // it is always only one controller connection ,so we don't mind having it as a class variable
     private Socket controllerConnection;
     private Socket clientConnection;
     private InetAddress localAddress ;
     private Communicator communicator;
-    private HashMap<String, Integer> fileSizeMap;
 
     private File fileFolder;
 
     public DStore(int port, int cport, int timeout, String file_folder) throws IOException {
 
-        fileSizeMap = new HashMap<>();
         this.file_folder = file_folder;
         setupFileStore(file_folder);
 
@@ -35,19 +35,19 @@ public class DStore {
             throw new RuntimeException(e);
         }
 
+        // TODO : connect controller in a new thread because the controller will send messages to the Dstore
         connectController(localAddress, cport, port);
         openServerSocketForClient(port);
-
-
 
     }
 
     public void connectController (InetAddress localAddress, int cport, int port) {
         try {
             this.controllerConnection = new Socket(localAddress,cport);
-            communicator.sendMessage(controllerConnection, "JOIN " + port);
+            communicator.sendMessage(controllerConnection, Protocol.JOIN_TOKEN + " " + port);
             communicator.listenAndDisplayToTerminal(controllerConnection);
-            System.out.println("JOIN " + port + " send");
+            System.out.println(Protocol.JOIN_TOKEN + " " + port + " send");
+            // TODO : listen to controller messages
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -56,11 +56,11 @@ public class DStore {
     public void openServerSocketForClient(int port) {
 
         try (ServerSocket serverSocket = new ServerSocket(port)) {
-            // the for keeps the connection open
+            // permanently listen for new clients
             for(;;){
                 try{
                     Socket clientConnection = serverSocket.accept();
-                    this.clientConnection = clientConnection;
+                    // every client is in a new thread
                     new Thread(() -> {
                         try {
                             this.handleClientConnection(clientConnection);
@@ -68,13 +68,12 @@ public class DStore {
                             throw new RuntimeException(e);
                         }
                     }).start();
-                    //clientConnection.close();
                 }catch(Exception e){System.out.println("error "+e);}
             }
 
         }catch(Exception e){System.out.println("error "+e);}
-
-
+        // keep in mind that it opened a client connection in a new thread and that's it.
+        // the main tread is now finished
     }
 
     public synchronized void handleClientConnection(Socket clientConnection) throws IOException {
@@ -91,26 +90,38 @@ public class DStore {
 
             switch (splittedMessage[0]) {
 
-                case Protocol.STORE_TOKEN :
-                    fileSizeMap.put(splittedMessage[1], Integer.valueOf(splittedMessage[2]));
+                case Protocol.STORE_TOKEN -> {
                     communicator.sendMessage(clientConnection,Protocol.ACK_TOKEN);
                     storeFile(clientConnection,fileFolder + "/" + splittedMessage[1]);
                     // notice that the connection to the controller is done in way before and stored in a class variable
                     communicator.sendMessage(controllerConnection,Protocol.STORE_ACK_TOKEN + " " + splittedMessage[1]);
-                    break;
+                }
 
-                case Protocol.LOAD_TOKEN :
+                case Protocol.LOAD_DATA_TOKEN -> {
+                    loadFile(clientConnection,fileFolder + "/" + splittedMessage[1]);
+                    // TODO : listen for RELOAD if loading from previous dstore fails
+                }
 
-                default :
+                case Protocol.REMOVE_TOKEN -> {
+
+                }
+
+                case Protocol.LIST_TOKEN -> {
+
+                }
+
+                default -> {
                     System.out.println("no switch case covered in handled new clientConnection");
+                }
             }
+            // TODO : is this necessary ?
+            break;
         }
 
     }
 
 
-
-    public void storeFile(Socket connection,String fileName) throws IOException {
+    public void storeFile(Socket connection,String filename) throws IOException {
 
         InputStream in = connection.getInputStream();
         byte[] buf = new byte[1000]; int buflen;
@@ -121,10 +132,10 @@ public class DStore {
         //System.out.println("message starts with " + command);
         //if(command.equals(Protocol.STORE_TOKEN)) {
             //int secondSpace = firstBuffer.indexOf(" ", firstSpace + 1);
-        //String fileName =
+        //String filename =
                 //firstBuffer.substring(firstSpace + 1, secondSpace);
-        System.out.println("fileName with path is : " + fileName);
-        File outputFile = new File(fileName);
+        System.out.println("filename with path is : " + filename);
+        File outputFile = new File(filename);
         FileOutputStream out = new FileOutputStream(outputFile);
         //out.write(buf, secondSpace + 1, buflen - secondSpace - 1);
         while ((buflen = in.read(buf)) != -1) {
@@ -138,14 +149,38 @@ public class DStore {
        // }
     }
 
+    private void loadFile(Socket connection,String filename) throws IOException {
+
+        InputStream in = connection.getInputStream();
+        byte[] buf = new byte[1000]; int buflen;
+        buflen = in.read(buf);
+
+        System.out.println("filename with path is : " + filename);
+        File inputFile = new File(filename);
+        FileInputStream inf = new FileInputStream(inputFile);
+        OutputStream out = connection.getOutputStream();
+        while ((buflen = inf.read(buf)) != -1){
+            System.out.print("*");
+            out.write(buf,0,buflen);
+        }
+        in.close(); inf.close(); connection.close(); out.close();
+    }
+
 
     public void setupFileStore(String file_folder){
-        // creating file object
+        // creating folder
         this.fileFolder = new File(file_folder);
 
-        // creating the file if it doesn't exist
+        // creating the folder if it doesn't exist
         if(!this.fileFolder.exists()){
             this.fileFolder.mkdir();
+        } else {
+            File[] files = fileFolder.listFiles();
+            for (File file : files) {
+                if (file.isFile()) {
+                    file.delete();
+                }
+            }
         }
     }
 
