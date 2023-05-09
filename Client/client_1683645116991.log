@@ -1,0 +1,24 @@
+Connection established to port 4333
+Message sent to port 4333: STORE file1.txt 29
+Store operation started for file file1.txt
+Message received from port 4333: STORE_TO 2333 2334 2335
+Controller replied to store file1.txt in these Dstores: 2333 2334 2335 
+Connection established to port 2333
+Message sent to port 2333: STORE file1.txt 29
+Storing file file1.txt to Dstore 2333
+Message received from port 2333: ACK
+ACK received from Dstore 2333 to store file file1.txt
+Store of file file1.txt to Dstore 2333 successfully completed
+Connection established to port 2334
+Message sent to port 2334: STORE file1.txt 29
+Storing file file1.txt to Dstore 2334
+Message received from port 2334: ACK
+ACK received from Dstore 2334 to store file file1.txt
+Store of file file1.txt to Dstore 2334 successfully completed
+Connection established to port 2335
+Message sent to port 2335: STORE file1.txt 29
+Storing file file1.txt to Dstore 2335
+Message received from port 2335: ACK
+ACK received from Dstore 2335 to store file file1.txt
+Store of file file1.txt to Dstore 2335 successfully completed
+Timeout expired while reading from port 4333

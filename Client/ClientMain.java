@@ -39,16 +39,29 @@ public class ClientMain {
 //		}
 	}
 
-	private static void testStore(int cport, int timeout, File downloadFolder, File uploadFolder) throws IOException {
+	private static void testStore(int cport, int timeout, File downloadFolder, File uploadFolder) throws IOException, InterruptedException {
 
 		Client client = new Client(cport, timeout, Logger.LoggingType.ON_FILE_AND_TERMINAL);
 		client.connect();
+
+		// client.send("Wrong message");
+
+//		try {
+//			client.store(new File(uploadFolder + "/" + "file1.txt"));
+//		} catch (IOException e) {
+//			System.out.println("store error :");
+//			throw new RuntimeException(e);
+//		}
+//		Thread.sleep(1000);
+
 		try {
-			client.store(new File(uploadFolder + "/" + "file1.txt"));
+			client.load("file1.txt");
 		} catch (IOException e) {
-			System.out.println("store error :");
+			System.out.println("load error :");
 			throw new RuntimeException(e);
 		}
+
+
 
 //		try {
 //			//client = new Client(cport, timeout, Logger.LoggingType.ON_FILE_AND_TERMINAL);

@@ -3,8 +3,6 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
-import java.util.HashMap;
-import java.util.concurrent.CountDownLatch;
 
 public class DStore {
 
@@ -91,10 +89,10 @@ public class DStore {
             switch (splittedMessage[0]) {
 
                 case Protocol.STORE_TOKEN -> {
-                    communicator.sendMessage(clientConnection,Protocol.ACK_TOKEN);
+                    communicator.sendMessage(clientConnection, Protocol.ACK_TOKEN);
                     storeFile(clientConnection,fileFolder + "/" + splittedMessage[1]);
                     // notice that the connection to the controller is done in way before and stored in a class variable
-                    communicator.sendMessage(controllerConnection,Protocol.STORE_ACK_TOKEN + " " + splittedMessage[1]);
+                    communicator.sendMessage(controllerConnection, Protocol.STORE_ACK_TOKEN + " " + splittedMessage[1]);
                 }
 
                 case Protocol.LOAD_DATA_TOKEN -> {
@@ -121,11 +119,10 @@ public class DStore {
     }
 
 
-    public void storeFile(Socket connection,String filename) throws IOException {
+    public void storeFile(Socket clientConnection,String filename) throws IOException {
 
-        InputStream in = connection.getInputStream();
+        InputStream in = clientConnection.getInputStream();
         byte[] buf = new byte[1000]; int buflen;
-        buflen = in.read(buf);
         //String firstBuffer = new String(buf,0,buflen);
         //int firstSpace = firstBuffer.indexOf(" ");
         //String command = firstBuffer.substring(0,firstSpace);
@@ -144,26 +141,26 @@ public class DStore {
         }
         // close all the connections
         in.close();
-        connection.close();
+        clientConnection.close();
         out.close();
        // }
     }
 
-    private void loadFile(Socket connection,String filename) throws IOException {
+    // TODO : load is not working
+    private void loadFile(Socket clientConnection,String filename) throws IOException {
 
-        InputStream in = connection.getInputStream();
         byte[] buf = new byte[1000]; int buflen;
-        buflen = in.read(buf);
 
         System.out.println("filename with path is : " + filename);
         File inputFile = new File(filename);
         FileInputStream inf = new FileInputStream(inputFile);
-        OutputStream out = connection.getOutputStream();
+        OutputStream out = clientConnection.getOutputStream();
         while ((buflen = inf.read(buf)) != -1){
             System.out.print("*");
             out.write(buf,0,buflen);
         }
-        in.close(); inf.close(); connection.close(); out.close();
+        inf.close(); clientConnection.close(); out.close();
+        System.out.println("load finished");
     }
 
 
@@ -176,6 +173,7 @@ public class DStore {
             this.fileFolder.mkdir();
         } else {
             File[] files = fileFolder.listFiles();
+            //assert files != null;
             for (File file : files) {
                 if (file.isFile()) {
                     file.delete();

@@ -23,3 +23,6 @@ ACK received from Dstore 2335 to store file file1.txt
 Store of file file1.txt to Dstore 2335 successfully completed
 Message received from port 4333: STORE_COMPLETE
 Store operation for file file1.txt completed
+Message sent to port 4333: LOAD file1.txt
+Load operation for file file1.txt started
+Timeout expired while reading from port 4333

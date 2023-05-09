@@ -1,6 +1,5 @@
 import java.io.*;
 import java.net.*;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Objects;
 
@@ -16,26 +15,113 @@ public class MyClient {
 
         String filename = "file1.txt";
 
-        int fileSize = 100;
+        int fileSize = 12;
 
         //Client client = new Client(cport,timeout,logger);
 
         //client.store(new File(filename));
 
-        callControllerTest1(cport, filename, fileSize);
+        callControllerForStore(cport, filename, fileSize);
+
+        // callControllerForLoad(cport,filename);
 
 
 
     }
 
-    public void callControllerTest1(int cport, String filename, int fileSize) {
+//    private void callControllerForLoad(int cport, String filename) {
+//        try{
+//            // create connection
+//            InetAddress localAddress = InetAddress.getLocalHost();
+//            Socket connection = new Socket(localAddress,cport);
+//
+//            sendMessage(connection, Protocol11.LOAD_TOKEN + " " + filename);
+//
+//            ArrayList<Integer> allDstoresPorts = listenForAllDstoresPortsInLoad(connection);
+//
+//            for (Integer allDstoresPort : allDstoresPorts) {
+//                callDstoreInLoad(allDstoresPort);
+//            }
+//
+//            //listenLoadComplete(connection);
+//
+//
+//        }catch(Exception e){
+//            System.out.println("error"+e);
+//        }
+//
+//        System.out.println("MESSAGES " + " sent");
+//    }
+
+//    private void callDstoreInLoad(Integer port) {
+//        try{
+//
+//            InetAddress localAddress = InetAddress.getLocalHost();
+//            Socket dstoreConnection = new Socket(localAddress,port);
+//
+//            String messageString = (Protocol11.LOAD_DATA_TOKEN + " file1.txt 101");
+//            String[] messageSplitted = messageString.split(" ");
+//
+//            sendMessage(dstoreConnection,messageString);
+//
+//            new Thread(() -> {
+//                try {
+//                    BufferedReader in = new BufferedReader(
+//                            new InputStreamReader(dstoreConnection.getInputStream())
+//                    );
+//                    while(true) {
+//                        String line;
+//                        //if (Objects.equals(line = in.readLine(), Protocol11.ACK_TOKEN)){
+//                            File inputFile = new File(messageSplitted[1]);
+//                            sendFile(dstoreConnection,inputFile);
+//                            break;
+//                        //}
+//                        //System.out.println(line + " received");
+//                    }
+//                } catch (IOException e) {
+//                    throw new RuntimeException(e);
+//                }
+//            }).start();
+//
+//        }catch(Exception e){System.out.println("Error in callDstore");}
+//    }
+
+//    public ArrayList<Integer> listenForAllDstoresPortsInLoad(Socket connection) {
+//
+//        ArrayList<Integer> allPorts = new ArrayList<>();
+//
+//        try {
+//            BufferedReader in = new BufferedReader(
+//                    new InputStreamReader(connection.getInputStream())
+//            );
+//            while(true) {
+//                String line;
+//                if (Objects.equals(((line = in.readLine())).split(" ")[0], Protocol11.LOAD_FROM_TOKEN)) {
+//                    System.out.println(line);
+//                    for (int i = 1; i < line.split(" ").length; i++) {
+//                        //System.out.println(line.split(" ")[i]);
+//                        allPorts.add(Integer.parseInt(line.split(" ")[i]));
+//                    }
+//                    break;
+//                } else {
+//                    System.out.println(line);
+//                    break;
+//                }
+//            }
+//        } catch (IOException e) {
+//            throw new RuntimeException(e);
+//        }
+//        return allPorts;
+//    }
+
+    public void callControllerForStore(int cport, String filename, int fileSize) {
 
         try{
             // create connection
             InetAddress localAddress = InetAddress.getLocalHost();
             Socket connection = new Socket(localAddress,cport);
 
-            sendMessage(connection, Protocol.STORE_TOKEN + " " + filename + " " + fileSize);
+            sendMessage(connection, Protocol1.STORE_TOKEN + " " + filename + " " + fileSize);
 
             ArrayList<Integer> allDstoresPorts = listenForAllDstoresPorts(connection);
 
@@ -59,7 +145,7 @@ public class MyClient {
             InetAddress localAddress = InetAddress.getLocalHost();
             Socket dstoreConnection = new Socket(localAddress,port);
 
-            String messageString = (Protocol.STORE_TOKEN + " to_store.txt 101");
+            String messageString = (Protocol1.STORE_TOKEN + " file1.txt 12");
             String[] messageSplitted = messageString.split(" ");
 
             sendMessage(dstoreConnection,messageString);
@@ -71,7 +157,7 @@ public class MyClient {
                     );
                     while(true) {
                         String line;
-                        if (Objects.equals(line = in.readLine(), Protocol.ACK_TOKEN)){
+                        if (Objects.equals(line = in.readLine(), Protocol1.ACK_TOKEN)){
                             File inputFile = new File(messageSplitted[1]);
                             sendFile(dstoreConnection,inputFile);
                             break;
@@ -127,7 +213,7 @@ public class MyClient {
             );
             while(true) {
                 String line;
-                if (Objects.equals(((line = in.readLine())).split(" ")[0], Protocol.STORE_TO_TOKEN)) {
+                if (Objects.equals(((line = in.readLine())).split(" ")[0], Protocol1.STORE_TO_TOKEN)) {
                     System.out.println(line);
                     for (int i = 1; i < line.split(" ").length; i++) {
                         //System.out.println(line.split(" ")[i]);
@@ -153,13 +239,13 @@ public class MyClient {
             );
             while(true) {
                 String line;
-                if (Objects.equals(((line = in.readLine())).split(" ")[0], Protocol.STORE_COMPLETE_TOKEN)) {
+                if (Objects.equals(((line = in.readLine())).split(" ")[0], Protocol1.STORE_COMPLETE_TOKEN)) {
                     System.out.println(line);
                     break;
-                } else if (Objects.equals(((line = in.readLine())).split(" ")[0], Protocol.ERROR_FILE_ALREADY_EXISTS_TOKEN)) {
+                } else if (Objects.equals(((line = in.readLine())).split(" ")[0], Protocol1.ERROR_FILE_ALREADY_EXISTS_TOKEN)) {
                     System.out.println(line);
                     break;
-                } else if (Objects.equals(((line = in.readLine())).split(" ")[0], Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN)) {
+                } else if (Objects.equals(((line = in.readLine())).split(" ")[0], Protocol1.ERROR_FILE_DOES_NOT_EXIST_TOKEN)) {
                     System.out.println(line);
                     break;
                 }

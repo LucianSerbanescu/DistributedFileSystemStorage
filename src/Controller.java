@@ -3,6 +3,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -11,6 +12,9 @@ public class Controller {
 
     // to not pass the argument in multiple functions, I just keep R as class variable
     private final int R;
+
+    // timeout will be the same everywhere
+    private final int timeout;
 
     // communicator send messages and display on terminal the received ones
     private final Communicator communicator;
@@ -30,9 +34,13 @@ public class Controller {
     // keep the number of running threads
     private CountDownLatch latch;
 
+    // TODO : set timeouts everywhere
+    // TODO : the controller doesnt listen to more than one action from the same client
+
     public Controller (int cport, int R, int timeout, int rebalance_period) {
 
         this.R = R;
+        this.timeout = timeout;
 
         latch = new CountDownLatch(R);
 
@@ -59,7 +67,9 @@ public class Controller {
                 );
                 handleNewConnection(connection,in);
 
-            }catch(Exception e){ System.out.println("error in openServerSocket : " + e); }
+            } catch(Exception e)  {
+                System.out.println("error in openServerSocket : " + e);
+            }
         }
 
     }
@@ -97,7 +107,7 @@ public class Controller {
                         break;
                     }
                 } else if (communicator.receiveAnyMessage(splittedMessage).equals("CLIENT")) {
-                    communicator.sendMessage(connection,Protocol.ERROR_NOT_ENOUGH_DSTORES_TOKEN);
+                    communicator.sendMessage(connection, Protocol.ERROR_NOT_ENOUGH_DSTORES_TOKEN);
                     connection.close();
                 }
             }
@@ -110,12 +120,13 @@ public class Controller {
 
             case Protocol.STORE_TOKEN -> {
                 if (index.containsKey(splittedMessage[1])) {
-                    communicator.sendMessage(connection,Protocol.ERROR_FILE_ALREADY_EXISTS_TOKEN);
+                    communicator.sendMessage(connection, Protocol.ERROR_FILE_ALREADY_EXISTS_TOKEN);
                 } else {
                     index.put(splittedMessage[1], "STORE_IN_PROGRESS");
+                    fileSizeMap.put(splittedMessage[1],splittedMessage[2]);
                     handleStore(connection);
                     latch.await();
-                    communicator.sendMessage(connection,Protocol.STORE_COMPLETE_TOKEN);
+                    communicator.sendMessage(connection, Protocol.STORE_COMPLETE_TOKEN);
                 }
             }
 
@@ -125,15 +136,19 @@ public class Controller {
                 // check if the file is in any dstore
                 if (fileDistributionInDstoresMap.containsKey(filename)) {
                     ArrayList<Integer> dstoresFileList = fileDistributionInDstoresMap.get(filename);
-                    communicator.sendMessage(connection,Protocol.LOAD_FROM_TOKEN+ " " + dstoresFileList.get(0) + " " + fileSizeMap.get(filename));
-
-                    // TODO : listen for RELOAD if loading from previous dstore fails
-                    // TODO : send back the new port of another dstore
+                    //communicator.sendMessage(connection,Protocol.LOAD_FROM_TOKEN+ " " + dstoresFileList.get(0) + " " + fileSizeMap.get(filename));
+                    communicator.sendMessage(connection, Protocol.LOAD_FROM_TOKEN+ " " + dstoresFileList.get(0) + " " + fileSizeMap.get(filename));
 
                 } else {
                     // TODO : what if the index is different from where the files are stored
-                    communicator.sendMessage(connection,Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
+                    communicator.sendMessage(connection, Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
                 }
+            }
+
+            case Protocol.RELOAD_TOKEN -> {
+                // TODO : listen for RELOAD if loading from previous dstore fails
+                // TODO : send back the new port of another dstore
+
             }
 
             case Protocol.REMOVE_TOKEN -> {
@@ -146,7 +161,7 @@ public class Controller {
                     //latch.await();
                     //communicator.sendMessage(connection,Protocol.REMOVE_COMPLETE_TOKEN);
                 } else {
-                    communicator.sendMessage(connection,Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
+                    communicator.sendMessage(connection, Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
                 }
             }
 
@@ -155,7 +170,7 @@ public class Controller {
             }
 
             default -> {
-                System.out.println("couldn't handle client message");
+                System.out.println("couldn't handle client message in CLiendHandle mothod");
             }
         }
 
@@ -172,13 +187,14 @@ public class Controller {
                 storeToList.append(dstorePortsList.get(i)).append(" ");
             }
         }
-        communicator.sendMessage(connection,Protocol.STORE_TO_TOKEN + " " + storeToList);
+        communicator.sendMessage(connection, Protocol.STORE_TO_TOKEN + " " + storeToList);
     }
 
 
     public void handleDstoreConnection(Socket connection, int port) throws IOException {
 
         try {
+            // TODO need to set the timeout after the store is send
             BufferedReader in = new BufferedReader(
                     new InputStreamReader(connection.getInputStream())
             );
@@ -189,13 +205,21 @@ public class Controller {
                     case Protocol.STORE_ACK_TOKEN ->  {
 
                         index.put(line.split(" ")[1],"STORE_COMPLETED");
-                        fileSizeMap.put(line.split(" ")[1],line.split(" ")[2]);
+                        // TODO delete fileSize from index if the ack token wasnt received
                         // edit the dstores list by : find the value, get the value ,change the value, and put back teh value
-                        ArrayList<Integer> dstoresList = fileDistributionInDstoresMap.get(line.split(" ")[1]);
-                        dstoresList.add(port);
-                        fileDistributionInDstoresMap.put(line.split(" ")[1],dstoresList);
-
+                        // if the arraylist in the map is empty , lut one , otherwise complete it
+                        if ( fileDistributionInDstoresMap.get(line.split(" ")[1]) == null) {
+                            ArrayList<Integer> dstoresList = new ArrayList<>();
+                            dstoresList.add(port);
+                            fileDistributionInDstoresMap.put(line.split(" ")[1],dstoresList);
+                        } else {
+                            ArrayList<Integer> dstoresList = fileDistributionInDstoresMap.get(line.split(" ")[1]);
+                            dstoresList.add(port);
+                            fileDistributionInDstoresMap.put(line.split(" ")[1],dstoresList);
+                        }
+                        System.out.println(fileDistributionInDstoresMap.get(line.split(" ")[1]));
                         latch.countDown();
+                        System.out.println(" pass the latch ");
                     }
 
                     // Dstore do not communicate with controller in LOAD operation
@@ -215,6 +239,8 @@ public class Controller {
                     }
                     }
                 }
+        } catch (SocketTimeoutException e) {
+            System.out.println("Timeout expired in handleDstoreConnection");
         } catch (IOException e) {
             System.out.println("Error produced in listening if the file has been stored");
             throw new RuntimeException(e);
