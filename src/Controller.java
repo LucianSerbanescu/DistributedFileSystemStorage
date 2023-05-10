@@ -1,3 +1,4 @@
+import javax.sound.midi.InvalidMidiDataException;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -21,11 +22,15 @@ public class Controller {
     // communicator send messages and display on terminal the received ones
     private final Communicator communicator;
 
-    // keep track of file progress
-    private ConcurrentHashMap<String,String> index;
 
     // keep ports of connected dstores
     private ArrayList<Integer> dstorePortsList;
+
+    // keep a list with all the dstore connections
+    private ArrayList<Socket> dstoresConnectionsList;
+
+    // keep track of file progress
+    private ConcurrentHashMap<String,String> index;
 
     // keep all the filesizes
     private ConcurrentHashMap<String,String> fileSizeMap;
@@ -36,10 +41,6 @@ public class Controller {
     // keep the number of running threads
     private CountDownLatch storeLatch;
     private CountDownLatch removeLatch ;
-
-    // keep a list with all the dstore connections
-    private ArrayList<Socket> dstoresConnectionsList;
-
 
     // TODO : set timeouts everywhere
 
@@ -66,7 +67,6 @@ public class Controller {
         // the Controller should always listen for new connections
         System.out.println("-> waiting for " + R + " dstores to join");
         for(;;){
-
             // listen to new connections forever
             try (ServerSocket serverSocket = new ServerSocket(cport)) {
                 Socket connection = serverSocket.accept();
@@ -81,7 +81,6 @@ public class Controller {
                         throw new RuntimeException(e);
                     }
                 }).start();
-                // give a second to the dstore to connect
             } catch(Exception e)  {
                 System.out.println("error in openServerSocket : " + e);
             }
@@ -107,7 +106,7 @@ public class Controller {
                     try {
                         dstoresConnectionsList.add(connection);
                         // continue listening to the dstore messages
-                        handleDstoreConnection(connection,port);
+                        handleDstoreConnection(connection);
 
                         // handle dstore disconnection
                         System.out.println("-> [" + port + "] DISCONNECTED");
@@ -121,8 +120,8 @@ public class Controller {
             } else {
                 if(dstorePortsList.size() >= R) {
                     if (communicator.receiveAnyMessage(splittedMessage).equals("CLIENT")){
-                        storeLatch = new CountDownLatch(dstorePortsList.size());
-                        removeLatch = new CountDownLatch(dstorePortsList.size());
+                        storeLatch = new CountDownLatch(R);
+                        removeLatch = new CountDownLatch(R);
 
                         new Thread(() -> {
                             try {
@@ -153,13 +152,19 @@ public class Controller {
                     communicator.sendMessage(connection, Protocol.ERROR_FILE_ALREADY_EXISTS_TOKEN);
                 } else {
                     index.put(splittedMessage[1], "STORE_IN_PROGRESS");
-                    fileSizeMap.put(splittedMessage[1],splittedMessage[2]);
-                    handleStore(connection);
-                    if (storeLatch.await(timeout, TimeUnit.MILLISECONDS)) {
-
+                    // handle store in another method
+                    handleStore(connection,splittedMessage);
+                    System.out.println("-> SYSTEM TIMEOUT WAITING ALL ACK FROM DSTORES");
+                    // once all ACK messages are received , we know for sure that the stored is completed ,so we modify the index
+                    if (storeLatch.await(timeout, TimeUnit.MILLISECONDS) && fileDistributionInDstoresMap.get(splittedMessage[1]).size() == R) {
+                        index.put(splittedMessage[1],"STORE_COMPLETED");
+                        fileSizeMap.put(splittedMessage[1],splittedMessage[2]);
                         communicator.sendMessage(connection, Protocol.STORE_COMPLETE_TOKEN);
                     } else {
-                        // TODO : remove all the file from index
+                        System.out.println("-> ERROR TIMEOUT : THE FILE WAS NOT STORED SUCCESSFULLY ");
+                        index.remove(splittedMessage[1]);
+                        // TODO : what if the file don't exist as a key to be removed
+                        fileDistributionInDstoresMap.remove(splittedMessage[1]);
                     }
                 }
             }
@@ -179,25 +184,25 @@ public class Controller {
                 }
             }
 
-            case Protocol.RELOAD_TOKEN -> {
-                // TODO : listen for RELOAD if loading from previous dstore fails
-                // TODO : send back the new port of another dstore
-
-            }
 
             case Protocol.REMOVE_TOKEN -> {
                 if (index.containsKey(splittedMessage[1])) {
+
                     for (Socket eachDstoreConnection : dstoresConnectionsList) {
-                        communicator.sendMessage(eachDstoreConnection,Protocol.REMOVE_TOKEN + " " + splittedMessage[1]);
+                        // send only to the connections that contains the files
+                        if(fileDistributionInDstoresMap.get(splittedMessage[1]).contains(eachDstoreConnection.getPort())) {
+                            communicator.sendMessage(eachDstoreConnection,Protocol.REMOVE_TOKEN + " " + splittedMessage[1]);
+                        }
                     }
                     if (removeLatch.await(timeout,TimeUnit.MILLISECONDS)) {
                         communicator.sendMessage(connection,Protocol.REMOVE_COMPLETE_TOKEN);
 
                     } else {
                         // TODO : check the else branch
-                        System.out.println("-> ERROR : timeout");
+                        System.out.println("-> ERROR TIMEOUT : THE FILE WAS NOT REMOVED SUCCESFULLY");
                     }
                 } else {
+                    System.out.println("-> ERROR : FILE DOES NOT EXIST");
                     communicator.sendMessage(connection, Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
                 }
             }
@@ -214,10 +219,11 @@ public class Controller {
     }
 
     // send the message to the client where to store the files "STORE_TO ..."
-    public void handleStore(Socket connection) throws IOException {
-        // TODO: need to rechange the way Controller picks the Dstores where the file will be stored
+    public void handleStore(Socket connection,String[] splittedMessage) throws IOException {
+
+        // TODO: need to change the way Controller picks the Dstores where the file will be stored
         StringBuilder storeToList = new StringBuilder();
-        for (int i = 0; i < dstorePortsList.size(); i++) {
+        for (int i = 0 ; i < dstorePortsList.size(); i++) {
             if(i == dstorePortsList.size() - 1) {
                 storeToList.append(dstorePortsList.get(i));
             } else {
@@ -225,10 +231,12 @@ public class Controller {
             }
         }
         communicator.sendMessage(connection, Protocol.STORE_TO_TOKEN + " " + storeToList);
+
+
     }
 
 
-    public void handleDstoreConnection(Socket connection, int port) throws IOException {
+    public void handleDstoreConnection(Socket connection) throws IOException {
 
         try {
             BufferedReader in = new BufferedReader(
@@ -241,33 +249,33 @@ public class Controller {
                 switch (line.split(" ")[0]) {
 
                     case Protocol.STORE_ACK_TOKEN ->  {
-
-//                        // once all ACK message is received , we know for sure that the stored is completed so we modifie the index
-//                        index.put(line.split(" ")[1],"STORE_COMPLETED");
-//                        // TODO delete fileSize from index if the ack token wasnt received
-//                        // edit the dstores list by : find the value, get the value ,change the value, and put back teh value
-//                        // if the arraylist in the map is empty , put one , otherwise complete it
-//                        if ( fileDistributionInDstoresMap.get(line.split(" ")[1]) == null) {
-//                            ArrayList<Integer> dstoresList = new ArrayList<>();
-//                            dstoresList.add(port);
-//                            fileDistributionInDstoresMap.put(line.split(" ")[1],dstoresList);
-//                        } else {
-//                            ArrayList<Integer> dstoresList = fileDistributionInDstoresMap.get(line.split(" ")[1]);
-//                            dstoresList.add(port);
-//                            fileDistributionInDstoresMap.put(line.split(" ")[1],dstoresList);
-//                        }
-
+                        // edit the dstores list by : find the value, get the value ,change the value, and put back teh value
+                        // if the arraylist in the map is empty , put one , otherwise complete it
+                        if ( fileDistributionInDstoresMap.get(line.split(" ")[1]) == null) {
+                            ArrayList<Integer> dstoresList = new ArrayList<>();
+                            dstoresList.add(connection.getPort());
+                            System.out.println("-> FILE STORED TO : [" + connection.getPort() + "]");
+                            fileDistributionInDstoresMap.put(line.split(" ")[1],dstoresList);
+                        } else {
+                            ArrayList<Integer> dstoresList = fileDistributionInDstoresMap.get(line.split(" ")[1]);
+                            dstoresList.add(connection.getPort());
+                            fileDistributionInDstoresMap.put(line.split(" ")[1],dstoresList);
+                        }
                         storeLatch.countDown();
-
                     }
 
                     // Dstore do not communicate with controller in LOAD operation
 
                     case Protocol.REMOVE_ACK_TOKEN ->  {
-                        // TODO : I received only one dstore remove_ack
-                        // TODO : I need to keep count of how many of this I receive
-                        // TODO : remove the file from index
-                        removeLatch.countDown();
+
+                        // TODO : check which file is removed
+//                        ArrayList<Integer>
+//                        if () {
+                            removeLatch.countDown();
+
+//                        } else {
+//                            System.out.println("-> ERROR : ");
+//                        }
                     }
 
                     // Dstore do not communicate with controller in LIST operation

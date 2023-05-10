@@ -76,7 +76,12 @@ public class DStore {
                 case Protocol.REMOVE_TOKEN -> {
                     // detlete file from dstore folder
                     File file = new File((fileFolder + "/" + splittedMessage[1]));
-                    file.delete();
+                    if (file.delete()) {
+                        System.out.println("-> FILE " + splittedMessage[1] + " DELETED");
+
+                    } else {
+                        System.out.println("-> NO FILE TO DELETE");
+                    }
                     communicator.sendMessage(controllerConnection, Protocol.REMOVE_ACK_TOKEN + " " + splittedMessage[1]);
                 }
 
