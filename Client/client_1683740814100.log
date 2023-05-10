@@ -1,0 +1,5 @@
+Connection established to port 4333
+Message sent to port 4333: REMOVE file1.txt
+Remove operation for file file1.txt started
+Message received from port 4333: REMOVE_COMPLETE
+Remove operation for file file1.txt successfully completed

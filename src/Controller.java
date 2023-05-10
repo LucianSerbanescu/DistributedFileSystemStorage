@@ -4,6 +4,7 @@ import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
+import java.sql.SQLOutput;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -41,16 +42,11 @@ public class Controller {
 
 
     // TODO : set timeouts everywhere
-    // TODO : the controller doesnt listen to more than one action from the same client
 
     public Controller (int cport, int R, int timeout, int rebalance_period) {
 
         this.R = R;
         this.timeout = timeout;
-
-        storeLatch = new CountDownLatch(R);
-        // TODO : ned to change R with the actual number of dstores
-        removeLatch = new CountDownLatch(R);
 
         this.communicator = new Communicator();
 
@@ -66,16 +62,26 @@ public class Controller {
 
     public void openServerSocket(int cport) {
 
+        System.out.println("*** CONTROLLER STARTED ***");
         // the Controller should always listen for new connections
-        System.out.println("waiting for R dstores to connect");
+        System.out.println("-> waiting for " + R + " dstores to join");
         for(;;){
+
             // listen to new connections forever
             try (ServerSocket serverSocket = new ServerSocket(cport)) {
                 Socket connection = serverSocket.accept();
-                BufferedReader in = new BufferedReader(
-                        new InputStreamReader(connection.getInputStream())
-                );
-                handleNewConnection(connection,in);
+                // TODO : this might be helpful for more clients
+                new Thread(() -> {
+                    try {
+                        BufferedReader in = new BufferedReader(
+                                new InputStreamReader(connection.getInputStream())
+                        );
+                        handleNewConnection(connection,in);
+                    } catch (IOException | InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }).start();
+                // give a second to the dstore to connect
             } catch(Exception e)  {
                 System.out.println("error in openServerSocket : " + e);
             }
@@ -87,13 +93,16 @@ public class Controller {
         String line;
         // start listening from one connection
         while((line = in.readLine()) != null) {
+            communicator.displayReceivedMessage(connection,line);
             String[] splittedMessage = line.split(" ");
             if (splittedMessage[0].equals(Protocol.JOIN_TOKEN)) {
-
                 Integer port = Integer.parseInt(splittedMessage[1]);
                 dstorePortsList.add(port);
-                System.out.println(port + " joined");
-
+                // communicator.displayConnectionMessage(connection,line);
+                System.out.println("-> [" + port + "] JOINED");
+                if (dstorePortsList.size() >= R ) {
+                    System.out.println("*** CLIENT REQUESTS OPEN ***");
+                }
                 new Thread(() -> {
                     try {
                         dstoresConnectionsList.add(connection);
@@ -101,18 +110,20 @@ public class Controller {
                         handleDstoreConnection(connection,port);
 
                         // handle dstore disconnection
-                        System.out.println("Dstore " + port + " disconnected");
+                        System.out.println("-> [" + port + "] DISCONNECTED");
                         dstorePortsList.remove(port);
                     } catch (IOException e) {
                         throw new RuntimeException(e);
                     }
                 }).start();
-
                 // stop listening to other messages from same connection
                 break;
             } else {
                 if(dstorePortsList.size() >= R) {
                     if (communicator.receiveAnyMessage(splittedMessage).equals("CLIENT")){
+                        storeLatch = new CountDownLatch(dstorePortsList.size());
+                        removeLatch = new CountDownLatch(dstorePortsList.size());
+
                         new Thread(() -> {
                             try {
                                 handleClientMessage(splittedMessage, connection);
@@ -121,12 +132,14 @@ public class Controller {
                             }
                         }).start();
                         // stop listening to other messages from same connection
-                        break;
+                        // break;
                     }
                 } else if (communicator.receiveAnyMessage(splittedMessage).equals("CLIENT")) {
+                    System.out.println("-> ERROR : not enough dstores connected");
                     communicator.sendMessage(connection, Protocol.ERROR_NOT_ENOUGH_DSTORES_TOKEN);
                     connection.close();
                 }
+                System.out.println("-> CLIENT DISCONNECTED");
             }
         }
     }
@@ -143,6 +156,7 @@ public class Controller {
                     fileSizeMap.put(splittedMessage[1],splittedMessage[2]);
                     handleStore(connection);
                     if (storeLatch.await(timeout, TimeUnit.MILLISECONDS)) {
+
                         communicator.sendMessage(connection, Protocol.STORE_COMPLETE_TOKEN);
                     } else {
                         // TODO : remove all the file from index
@@ -181,7 +195,7 @@ public class Controller {
 
                     } else {
                         // TODO : check the else branch
-                        System.out.println("REMOVE PROCCESS EXPIRED");
+                        System.out.println("-> ERROR : timeout");
                     }
                 } else {
                     communicator.sendMessage(connection, Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
@@ -193,7 +207,7 @@ public class Controller {
             }
 
             default -> {
-                System.out.println("couldn't handle client message in CLiendHandle mothod");
+                System.out.println("couldn't handle client message in ClientHandle method");
             }
         }
 
@@ -217,32 +231,34 @@ public class Controller {
     public void handleDstoreConnection(Socket connection, int port) throws IOException {
 
         try {
-            // TODO need to set the timeout after the store is send
             BufferedReader in = new BufferedReader(
                     new InputStreamReader(connection.getInputStream())
             );
             String line;
             while ((line = in.readLine()) != null) {
+                communicator.displayReceivedMessage(connection,line);
+
                 switch (line.split(" ")[0]) {
 
                     case Protocol.STORE_ACK_TOKEN ->  {
 
-                        index.put(line.split(" ")[1],"STORE_COMPLETED");
-                        // TODO delete fileSize from index if the ack token wasnt received
-                        // edit the dstores list by : find the value, get the value ,change the value, and put back teh value
-                        // if the arraylist in the map is empty , lut one , otherwise complete it
-                        if ( fileDistributionInDstoresMap.get(line.split(" ")[1]) == null) {
-                            ArrayList<Integer> dstoresList = new ArrayList<>();
-                            dstoresList.add(port);
-                            fileDistributionInDstoresMap.put(line.split(" ")[1],dstoresList);
-                        } else {
-                            ArrayList<Integer> dstoresList = fileDistributionInDstoresMap.get(line.split(" ")[1]);
-                            dstoresList.add(port);
-                            fileDistributionInDstoresMap.put(line.split(" ")[1],dstoresList);
-                        }
-                        System.out.println(fileDistributionInDstoresMap.get(line.split(" ")[1]));
+//                        // once all ACK message is received , we know for sure that the stored is completed so we modifie the index
+//                        index.put(line.split(" ")[1],"STORE_COMPLETED");
+//                        // TODO delete fileSize from index if the ack token wasnt received
+//                        // edit the dstores list by : find the value, get the value ,change the value, and put back teh value
+//                        // if the arraylist in the map is empty , put one , otherwise complete it
+//                        if ( fileDistributionInDstoresMap.get(line.split(" ")[1]) == null) {
+//                            ArrayList<Integer> dstoresList = new ArrayList<>();
+//                            dstoresList.add(port);
+//                            fileDistributionInDstoresMap.put(line.split(" ")[1],dstoresList);
+//                        } else {
+//                            ArrayList<Integer> dstoresList = fileDistributionInDstoresMap.get(line.split(" ")[1]);
+//                            dstoresList.add(port);
+//                            fileDistributionInDstoresMap.put(line.split(" ")[1],dstoresList);
+//                        }
+
                         storeLatch.countDown();
-                        System.out.println(" pass the latch ");
+
                     }
 
                     // Dstore do not communicate with controller in LOAD operation
@@ -260,10 +276,10 @@ public class Controller {
                         // TODO : if you timeout
                         // TODO : remove the file from store in progress / check the specs if you need to
                         System.out.println(line.split(" ")[0]);
-                        System.out.println("I didn't received the STORE_ACK message");
-                    }
+                        System.out.println("I didn't received the ACK message");
                     }
                 }
+            }
         } catch (SocketTimeoutException e) {
             System.out.println("Timeout expired in handleDstoreConnection");
         } catch (IOException e) {

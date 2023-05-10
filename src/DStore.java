@@ -41,10 +41,12 @@ public class DStore {
 
     public void connectController (InetAddress localAddress, int cport, int port) {
         try {
-            this.controllerConnection = new Socket(localAddress,cport);
+            System.out.println("-> CONNECTION ESTABLISHED TO CONTROLLER [" + cport + "]");
+            this.controllerConnection = new Socket(localAddress,cport,localAddress,port);
             communicator.sendMessage(controllerConnection, Protocol.JOIN_TOKEN + " " + port);
             // communicator.listenAndDisplayToTerminal(controllerConnection);
-            System.out.println(Protocol.JOIN_TOKEN + " " + port + " send");
+            // System.out.println(Protocol.JOIN_TOKEN + " " + port + " SENT");
+            System.out.println("[" + port + "]" + " -> " + "[" + cport + "] " + Protocol.JOIN_TOKEN);
 
             new Thread(() -> {
                 try {
@@ -66,7 +68,7 @@ public class DStore {
         );
         String line;
         while((line = in.readLine()) != null) {
-            System.out.println("message received : " + line);
+            System.out.println("-> RECEIVE : " + line);
             String[] splittedMessage = line.split(" ");
 
             switch (splittedMessage[0]) {
@@ -93,7 +95,6 @@ public class DStore {
                     // every client is in a new thread
                     new Thread(() -> {
                         try {
-                            System.out.println("hello1");
                             // TODO : Does not enter this method
                             this.handleClientConnection(clientConnection);
                         } catch (IOException e) {
@@ -117,7 +118,8 @@ public class DStore {
         // check if the message is from a client
         String line;
         while((line = in.readLine()) != null) {
-            System.out.println("message received : " + line);
+
+            communicator.displayReceivedMessage(clientConnection,line);
             String[] splittedMessage = line.split(" ");
 
             switch (splittedMessage[0]) {
@@ -128,6 +130,7 @@ public class DStore {
                     storeFile(clientConnection,fileFolder + "/" + splittedMessage[1]);
                     // notice that the connection to the controller is done in way before and stored in a class variable
                     communicator.sendMessage(controllerConnection, Protocol.STORE_ACK_TOKEN + " " + splittedMessage[1]);
+                    System.out.println("-> STORE FINISHED");
                 }
 
                 case Protocol.LOAD_DATA_TOKEN -> {
@@ -165,12 +168,13 @@ public class DStore {
             //int secondSpace = firstBuffer.indexOf(" ", firstSpace + 1);
         //String filename =
                 //firstBuffer.substring(firstSpace + 1, secondSpace);
-        System.out.println("filename with path is : " + filename);
+        System.out.println("-> PATH : " + filename);
         File outputFile = new File(filename);
         FileOutputStream out = new FileOutputStream(outputFile);
         //out.write(buf, secondSpace + 1, buflen - secondSpace - 1);
+        System.out.println("STORING FILE");
         while ((buflen = in.read(buf)) != -1) {
-            System.out.print("*");
+            System.out.println("*");
             out.write(buf, 0, buflen);
         }
         // close all the connections
@@ -185,16 +189,17 @@ public class DStore {
 
         byte[] buf = new byte[1000]; int buflen;
 
-        System.out.println("filename with path is : " + filename);
+        System.out.println("-> FILE PATH : " + filename);
         File inputFile = new File(filename);
         FileInputStream inf = new FileInputStream(inputFile);
         OutputStream out = clientConnection.getOutputStream();
+        System.out.println("LOADING FILE");
         while ((buflen = inf.read(buf)) != -1){
-            System.out.print("*");
+            System.out.println("*");
             out.write(buf,0,buflen);
         }
         inf.close(); clientConnection.close(); out.close();
-        System.out.println("load finished");
+        System.out.println("-> LOAD FINISHED");
     }
 
 

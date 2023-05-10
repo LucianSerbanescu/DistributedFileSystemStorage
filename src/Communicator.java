@@ -8,6 +8,15 @@ import java.net.Socket;
 
 public class Communicator {
 
+    public synchronized void displayReceivedMessage(Socket connection, String message) {
+        System.out.println("[" + connection.getPort() + "] -> [" + connection.getLocalPort() + "] : " + message);
+    }
+
+    public synchronized void displaySentMessage(Socket connection, String message) {
+        System.out.println("[" + connection.getLocalPort() + "] -> [" + connection.getPort() + "] : " + message);
+    }
+
+
     public synchronized void sendMessage(Socket connection , String message) {
 
         try {

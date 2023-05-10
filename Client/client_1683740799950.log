@@ -1,0 +1,13 @@
+Connection established to port 4333
+Message sent to port 4333: LOAD file1.txt
+Load operation for file file1.txt started
+Message received from port 4333: LOAD_FROM 2333 27
+Controller replied to load file file1.txt (size: 27 bytes) from Dstore 2333
+Connection established to port 2333
+Message sent to port 2333: LOAD_DATA file1.txt
+Loading file file1.txt from Dstore 2333
+Load operation of file file1.txt from Dstore 2333 successfully completed
+Message sent to port 4333: REMOVE file1.txt
+Remove operation for file file1.txt started
+Timeout expired while reading from port 4333
+Remove operation for file file1.txt not completed successfully
