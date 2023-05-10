@@ -1,5 +1,0 @@
-Connection established to port 4333
-Message sent to port 4333: LOAD file1.txt
-Load operation for file file1.txt started
-Message received from port 4333: ERROR_FILE_DOES_NOT_EXIST
-Load operation failed because file does not exist (filename: file1.txt)

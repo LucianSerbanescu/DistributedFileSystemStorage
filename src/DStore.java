@@ -43,13 +43,45 @@ public class DStore {
         try {
             this.controllerConnection = new Socket(localAddress,cport);
             communicator.sendMessage(controllerConnection, Protocol.JOIN_TOKEN + " " + port);
-            communicator.listenAndDisplayToTerminal(controllerConnection);
+            // communicator.listenAndDisplayToTerminal(controllerConnection);
             System.out.println(Protocol.JOIN_TOKEN + " " + port + " send");
-            // TODO : listen to controller messages
+
+            new Thread(() -> {
+                try {
+                    listenToController(controllerConnection);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }).start();
+
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
+
+    private void listenToController(Socket controllerConnection) throws IOException {
+
+        BufferedReader in = new BufferedReader(
+                new InputStreamReader(controllerConnection.getInputStream())
+        );
+        String line;
+        while((line = in.readLine()) != null) {
+            System.out.println("message received : " + line);
+            String[] splittedMessage = line.split(" ");
+
+            switch (splittedMessage[0]) {
+
+                case Protocol.REMOVE_TOKEN -> {
+                    // detlete file from dstore folder
+                    File file = new File((fileFolder + "/" + splittedMessage[1]));
+                    file.delete();
+                    communicator.sendMessage(controllerConnection, Protocol.REMOVE_ACK_TOKEN + " " + splittedMessage[1]);
+                }
+
+            }
+        }
+    }
+
 
     public void openServerSocketForClient(int port) {
 
@@ -61,6 +93,8 @@ public class DStore {
                     // every client is in a new thread
                     new Thread(() -> {
                         try {
+                            System.out.println("hello1");
+                            // TODO : Does not enter this method
                             this.handleClientConnection(clientConnection);
                         } catch (IOException e) {
                             throw new RuntimeException(e);
@@ -89,6 +123,7 @@ public class DStore {
             switch (splittedMessage[0]) {
 
                 case Protocol.STORE_TOKEN -> {
+                    clientConnection.setSoTimeout(timeout);
                     communicator.sendMessage(clientConnection, Protocol.ACK_TOKEN);
                     storeFile(clientConnection,fileFolder + "/" + splittedMessage[1]);
                     // notice that the connection to the controller is done in way before and stored in a class variable
@@ -96,13 +131,12 @@ public class DStore {
                 }
 
                 case Protocol.LOAD_DATA_TOKEN -> {
+                    clientConnection.setSoTimeout(timeout);
                     loadFile(clientConnection,fileFolder + "/" + splittedMessage[1]);
                     // TODO : listen for RELOAD if loading from previous dstore fails
                 }
 
-                case Protocol.REMOVE_TOKEN -> {
-
-                }
+                // In REMOVE operation the dstore receives no messages form the client
 
                 case Protocol.LIST_TOKEN -> {
 

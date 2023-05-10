@@ -1,5 +1,7 @@
+import javax.naming.ldap.SortKey;
 import java.io.File;
 import java.io.IOException;
+import java.net.Socket;
 import java.util.Random;
 
 /**
@@ -15,19 +17,35 @@ public class ClientMain {
 		int timeout = Integer.parseInt(args[1]);
 		
 		// this client expects a 'downloads' folder in the current directory; all files loaded from the store will be stored in this folder
-		File downloadFolder = new File("stored_in");
+		File downloadFolder = new File("downloads");
 		if (!downloadFolder.exists())
 			if (!downloadFolder.mkdir()) throw new RuntimeException("Cannot create download folder (folder absolute path: " + downloadFolder.getAbsolutePath() + ")");
 		
-		// this client expects a 'to_store.txt' folder in the current directory; all files to be stored in the store will be collected from this folder
-		File uploadFolder = new File("upload_folder");
+		// this client expects a 'to_store' folder in the current directory; all files to be stored in the store will be collected from this folder
+		File uploadFolder = new File("folderToUpload");
 		if (!uploadFolder.exists())
-			throw new RuntimeException("to_store.txt folder does not exist");
+			throw new RuntimeException("folderToUpload folder does not exist");
 
-		testStore(cport, timeout, downloadFolder,  uploadFolder);
+
+		Client client = new Client(cport,timeout, Logger.LoggingType.ON_FILE_AND_TERMINAL);
+		client.connect();
+
+
+		/// My tests :
+
+		testStore(client, uploadFolder);
+
+		testLoad(client);
+
+		testRemove(client);
+
+
+
+
+		/// Tested provided by University
 
 		// launch a single client
-		//testClient(cport, timeout, downloadFolder, uploadFolder);
+		// testClient(cport, timeout, downloadFolder, uploadFolder);
 		
 		// launch a number of concurrent clients, each doing the same operations
 //		for (int i = 0; i < 10; i++) {
@@ -39,68 +57,30 @@ public class ClientMain {
 //		}
 	}
 
-	private static void testStore(int cport, int timeout, File downloadFolder, File uploadFolder) throws IOException, InterruptedException {
-
-		Client client = new Client(cport, timeout, Logger.LoggingType.ON_FILE_AND_TERMINAL);
-		client.connect();
-
-		// client.send("Wrong message");
-
-//		try {
-//			client.store(new File(uploadFolder + "/" + "file1.txt"));
-//		} catch (IOException e) {
-//			System.out.println("store error :");
-//			throw new RuntimeException(e);
-//		}
-//		Thread.sleep(1000);
-
-		try {
-			client.load("file1.txt");
-		} catch (IOException e) {
-			System.out.println("load error :");
-			throw new RuntimeException(e);
-		}
 
 
+	private static void testStore(Client client, File uploadFolder) throws IOException {
 
-//		try {
-//			//client = new Client(cport, timeout, Logger.LoggingType.ON_FILE_AND_TERMINAL);
-//			client.connect();
-//			Random random = new Random(System.currentTimeMillis() * System.nanoTime());
-//
-//			File fileList[] = uploadFolder.listFiles();
-//			for (int i=0; i<fileList.length/2; i++) {
-//				File fileToStore = fileList[random.nextInt(fileList.length)];
-//				try {
-//					client.store(uploadFolder);
-//				} catch (Exception e) {
-//					System.out.println("Error storing file " + fileToStore);
-//					e.printStackTrace();
-//				}
-//			}
-//
-//			//String list[] = null;
-//			//try { list = list(client); } catch(IOException e) { e.printStackTrace(); }
-//
-////			for (int i = 0; i < list.length/4; i++) {
-////				String fileToRemove = list[random.nextInt(list.length)];
-////				try {
-////					client.remove(fileToRemove);
-////				} catch (Exception e) {
-////					System.out.println("Error remove file " + fileToRemove);
-////					e.printStackTrace();
-////				}
-////			}
-//
-//			// try { list = list(client); } catch(IOException e) { e.printStackTrace(); }
-//
-//		} catch(IOException e) {
-//			e.printStackTrace();
-//		} finally {
-//			if (client != null)
-//				try { client.disconnect(); } catch(Exception e) { e.printStackTrace(); }
-//		}
+
+		client.store(new File(uploadFolder + "/" + "file1.txt"));
+
+
 	}
+
+	private static void testLoad(Client client) throws IOException {
+
+		client.load( "file1.txt");
+
+	}
+
+
+	private static void testRemove(Client client) throws IOException {
+
+		client.remove("file1.txt");
+
+	}
+
+
 
 	public static void test2Client(int cport, int timeout, File downloadFolder, File uploadFolder) {
 		Client client = null;
@@ -155,7 +135,7 @@ public class ClientMain {
 			
 			try { list(client); } catch(IOException e) { e.printStackTrace(); }
 			
-			// store first file in the to_store.txt folder twice, then store second file in the to_store.txt folder once
+			// store first file in the to_store folder twice, then store second file in the to_store folder once
 			File fileList[] = uploadFolder.listFiles();
 			if (fileList.length > 0) {
 				try { client.store(fileList[0]); } catch(IOException e) { e.printStackTrace(); }				
