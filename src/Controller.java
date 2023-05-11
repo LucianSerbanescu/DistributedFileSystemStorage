@@ -38,9 +38,15 @@ public class Controller {
     // keep track of which dstore is each file
     private ConcurrentHashMap<String,ArrayList<Integer>> fileDistributionInDstoresMap;
 
+    // apparently the dstores sockets to the controller are different from server sockets, so I need to keep track of the real sockets and the ones given by me
+    private ConcurrentHashMap<Integer,Integer> dstoresPortsEquivalent;
+
     // keep the number of running threads
     private CountDownLatch storeLatch;
     private CountDownLatch removeLatch ;
+
+    // keep track of how many times it tried to reaload
+    private int reloadCounter;
 
     // TODO : set timeouts everywhere
 
@@ -56,6 +62,7 @@ public class Controller {
         this.dstorePortsList = new ArrayList<>();
         this.fileDistributionInDstoresMap = new ConcurrentHashMap<>();
         this.dstoresConnectionsList = new ArrayList<>();
+        this.dstoresPortsEquivalent = new ConcurrentHashMap<>();
 
         openServerSocket(cport);
 
@@ -92,11 +99,12 @@ public class Controller {
         String line;
         // start listening from one connection
         while((line = in.readLine()) != null) {
-            communicator.displayReceivedMessage(connection,line);
             String[] splittedMessage = line.split(" ");
             if (splittedMessage[0].equals(Protocol.JOIN_TOKEN)) {
                 Integer port = Integer.parseInt(splittedMessage[1]);
                 dstorePortsList.add(port);
+                dstoresPortsEquivalent.put(connection.getPort(),port);
+                communicator.displayReceivedMessage(connection,port,line);
                 // communicator.displayConnectionMessage(connection,line);
                 System.out.println("-> [" + port + "] JOINED");
                 if (dstorePortsList.size() >= R ) {
@@ -109,6 +117,7 @@ public class Controller {
                         handleDstoreConnection(connection);
 
                         // handle dstore disconnection
+                        dstoresPortsEquivalent.remove(connection.getPort());
                         System.out.println("-> [" + port + "] DISCONNECTED");
                         dstorePortsList.remove(port);
                     } catch (IOException e) {
@@ -118,6 +127,7 @@ public class Controller {
                 // stop listening to other messages from same connection
                 break;
             } else {
+                communicator.displayReceivedMessage(connection,line);
                 if(dstorePortsList.size() >= R) {
                     if (communicator.receiveAnyMessage(splittedMessage).equals("CLIENT")){
                         storeLatch = new CountDownLatch(R);
@@ -170,31 +180,27 @@ public class Controller {
             }
 
             case Protocol.LOAD_TOKEN -> {
-                // TODO : Handle ERROR_LOAD
-                String filename = splittedMessage[1];
-                // check if the file is in any dstore
-                if (fileDistributionInDstoresMap.containsKey(filename)) {
-                    ArrayList<Integer> dstoresFileList = fileDistributionInDstoresMap.get(filename);
-                    //communicator.sendMessage(connection,Protocol.LOAD_FROM_TOKEN+ " " + dstoresFileList.get(0) + " " + fileSizeMap.get(filename));
-                    communicator.sendMessage(connection, Protocol.LOAD_FROM_TOKEN+ " " + dstoresFileList.get(0) + " " + fileSizeMap.get(filename));
-
-                } else {
-                    // TODO : what if the index is different from where the files are stored
-                    communicator.sendMessage(connection, Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
-                }
+                reloadCounter = 0;
+                handleLoad(connection,splittedMessage);
             }
 
+            case Protocol.RELOAD_TOKEN -> {
+                handleReload(connection,splittedMessage);
+            }
 
             case Protocol.REMOVE_TOKEN -> {
                 if (index.containsKey(splittedMessage[1])) {
 
                     for (Socket eachDstoreConnection : dstoresConnectionsList) {
                         // send only to the connections that contains the files
-                        if(fileDistributionInDstoresMap.get(splittedMessage[1]).contains(eachDstoreConnection.getPort())) {
+                        if(fileDistributionInDstoresMap.get(splittedMessage[1]).contains(dstoresPortsEquivalent.get(eachDstoreConnection.getPort()))) {
                             communicator.sendMessage(eachDstoreConnection,Protocol.REMOVE_TOKEN + " " + splittedMessage[1]);
                         }
                     }
                     if (removeLatch.await(timeout,TimeUnit.MILLISECONDS)) {
+                        index.remove(splittedMessage[1]);
+                        fileDistributionInDstoresMap.remove(splittedMessage[1]);
+                        fileSizeMap.remove(splittedMessage[1]);
                         communicator.sendMessage(connection,Protocol.REMOVE_COMPLETE_TOKEN);
 
                     } else {
@@ -208,7 +214,20 @@ public class Controller {
             }
 
             case Protocol.LIST_TOKEN -> {
-                // TODO : send to the client a message with all the filenames from index
+
+                String fileList = "";
+                // System.out.println(fileDistributionInDstoresMap.keySet());
+
+                for ( String key : fileDistributionInDstoresMap.keySet() ) {
+                    if (fileList == "") {
+                        fileList = key;
+                    } else {
+                        fileList = key + " " + fileList;
+                    }
+                }
+
+                communicator.sendMessage(connection,fileList);
+
             }
 
             default -> {
@@ -235,6 +254,41 @@ public class Controller {
 
     }
 
+    public void handleLoad (Socket connection , String[] splittedMessage) {
+        String filename = splittedMessage[1];
+        // check if the file is in any dstore
+        //System.out.println(fileDistributionInDstoresMap.containsKey(filename));
+        if (fileDistributionInDstoresMap.containsKey(filename)) {
+            reloadCounter++;
+            ArrayList<Integer> dstoresFileList = fileDistributionInDstoresMap.get(filename);
+            int pos = dstoresFileList.get(0) + reloadCounter;
+            communicator.sendMessage(connection,Protocol.LOAD_FROM_TOKEN+ " " + pos + " " + fileSizeMap.get(filename));
+        } else {
+            // TODO : what if the index is different from where the files are stored
+            communicator.sendMessage(connection, Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
+        }
+    }
+
+    public void handleReload (Socket connection, String[] splittedMessage) {
+        String filename = splittedMessage[1];
+        // check if the file is in any dstore
+        // System.out.println(fileDistributionInDstoresMap.containsKey(filename));
+        if (fileDistributionInDstoresMap.containsKey(filename)) {
+            reloadCounter++;
+            ArrayList<Integer> dstoresFileList = fileDistributionInDstoresMap.get(filename);
+            int pos = dstoresFileList.get(0) + reloadCounter;
+            if ( pos < dstoresFileList.size()) {
+                communicator.sendMessage(connection,Protocol.LOAD_FROM_TOKEN+ " " + pos + " " + fileSizeMap.get(filename));
+
+            } else {
+                communicator.sendMessage(connection,Protocol.ERROR_LOAD_TOKEN);
+            }
+        } else {
+            // TODO : what if the index is different from where the files are stored
+            communicator.sendMessage(connection, Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
+        }
+    }
+
 
     public void handleDstoreConnection(Socket connection) throws IOException {
 
@@ -244,7 +298,7 @@ public class Controller {
             );
             String line;
             while ((line = in.readLine()) != null) {
-                communicator.displayReceivedMessage(connection,line);
+                communicator.displayReceivedMessage(connection,dstoresPortsEquivalent.get(connection.getPort()),line);
 
                 switch (line.split(" ")[0]) {
 
@@ -253,12 +307,12 @@ public class Controller {
                         // if the arraylist in the map is empty , put one , otherwise complete it
                         if ( fileDistributionInDstoresMap.get(line.split(" ")[1]) == null) {
                             ArrayList<Integer> dstoresList = new ArrayList<>();
-                            dstoresList.add(connection.getPort());
-                            System.out.println("-> FILE STORED TO : [" + connection.getPort() + "]");
+                            dstoresList.add(dstoresPortsEquivalent.get(connection.getPort()));
+                            System.out.println("-> FILE STORED TO : [" + dstoresPortsEquivalent.get(connection.getPort()) + "]");
                             fileDistributionInDstoresMap.put(line.split(" ")[1],dstoresList);
                         } else {
                             ArrayList<Integer> dstoresList = fileDistributionInDstoresMap.get(line.split(" ")[1]);
-                            dstoresList.add(connection.getPort());
+                            dstoresList.add(dstoresPortsEquivalent.get(connection.getPort()));
                             fileDistributionInDstoresMap.put(line.split(" ")[1],dstoresList);
                         }
                         storeLatch.countDown();
@@ -268,14 +322,8 @@ public class Controller {
 
                     case Protocol.REMOVE_ACK_TOKEN ->  {
 
-                        // TODO : check which file is removed
-//                        ArrayList<Integer>
-//                        if () {
-                            removeLatch.countDown();
+                        removeLatch.countDown();
 
-//                        } else {
-//                            System.out.println("-> ERROR : ");
-//                        }
                     }
 
                     // Dstore do not communicate with controller in LIST operation

@@ -1,8 +1,5 @@
 import java.io.*;
-import java.net.InetAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.UnknownHostException;
+import java.net.*;
 
 public class DStore {
 
@@ -41,10 +38,11 @@ public class DStore {
 
     public void connectController (InetAddress localAddress, int cport, int port) {
         try {
-            System.out.println("-> CONNECTION ESTABLISHED TO CONTROLLER [" + cport + "]");
-            this.controllerConnection = new Socket(localAddress,cport,localAddress,port);
+            this.controllerConnection = new Socket(localAddress,cport);
+
+            System.out.println("-> CONNECTION ESTABLISHED TO CONTROLLER [" + controllerConnection.getPort() + "]");
+            System.out.println("-> DSTORE REAL LOCAL PORT " + controllerConnection.getLocalPort());
             communicator.sendMessage(controllerConnection, Protocol.JOIN_TOKEN + " " + port);
-            // communicator.listenAndDisplayToTerminal(controllerConnection);
             // System.out.println(Protocol.JOIN_TOKEN + " " + port + " SENT");
             System.out.println("[" + port + "]" + " -> " + "[" + cport + "] " + Protocol.JOIN_TOKEN);
 
@@ -81,6 +79,7 @@ public class DStore {
 
                     } else {
                         System.out.println("-> NO FILE TO DELETE");
+                        communicator.sendMessage(controllerConnection,Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN + " " + splittedMessage[1]);
                     }
                     communicator.sendMessage(controllerConnection, Protocol.REMOVE_ACK_TOKEN + " " + splittedMessage[1]);
                 }
@@ -124,7 +123,7 @@ public class DStore {
         String line;
         while((line = in.readLine()) != null) {
 
-            communicator.displayReceivedMessage(clientConnection,line);
+            communicator.displayReceivedMessage(clientConnection,cport,line);
             String[] splittedMessage = line.split(" ");
 
             switch (splittedMessage[0]) {

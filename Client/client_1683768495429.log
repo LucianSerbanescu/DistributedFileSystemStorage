@@ -33,5 +33,5 @@ Loading file file1.txt from Dstore 2333
 Load operation of file file1.txt from Dstore 2333 successfully completed
 Message sent to port 4333: REMOVE file1.txt
 Remove operation for file file1.txt started
-Message received from port 4333: REMOVE_COMPLETE
-Remove operation for file file1.txt successfully completed
+Timeout expired while reading from port 4333
+Remove operation for file file1.txt not completed successfully

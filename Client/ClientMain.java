@@ -37,10 +37,9 @@ public class ClientMain {
 
 		testLoad(client);
 
-		testRemove(client);
+		// testRemove(client);
 
-
-
+		testList(client);
 
 		/// Tested provided by University
 
@@ -57,6 +56,9 @@ public class ClientMain {
 //		}
 	}
 
+	private static void testList(Client client) throws IOException {
+		client.list();
+	}
 
 
 	private static void testStore(Client client, File uploadFolder) throws IOException {
