@@ -57,7 +57,7 @@ public class ClientMain {
 	}
 
 	private static void testList(Client client) throws IOException {
-		client.list();
+
 	}
 
 
@@ -65,6 +65,7 @@ public class ClientMain {
 
 
 		client.store(new File(uploadFolder + "/" + "file1.txt"));
+		// client.wrongStore("file.txt",new byte[100]);
 
 
 	}
@@ -72,6 +73,7 @@ public class ClientMain {
 	private static void testLoad(Client client) throws IOException {
 
 		client.load( "file1.txt");
+		// client.wrongLoad("file1.txt",2);
 
 	}
 

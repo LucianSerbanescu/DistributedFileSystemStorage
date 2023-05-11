@@ -1,0 +1,6 @@
+Connection established to port 4333
+Message sent to port 4333: STORE file.txt 100
+Store operation started for file file.txt
+Message received from port 4333: STORE_TO 2333 2334 2335
+Controller replied to store file.txt in these Dstores: 2333 2334 2335 
+Timeout expired while reading from port 4333
