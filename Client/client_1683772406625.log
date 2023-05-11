@@ -1,6 +1,0 @@
-Connection established to port 4333
-Message sent to port 4333: LIST
-List operation started
-Message received from port 4333: file1.txt
-ERROR: Connection closed by the Controller
-List operation failed

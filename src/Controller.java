@@ -1,14 +1,11 @@
-import javax.sound.midi.InvalidMidiDataException;
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
-import java.sql.SQLOutput;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -70,6 +67,9 @@ public class Controller {
 
     }
 
+
+    ///    NEW CONNECTION  ////
+
     public void openServerSocket(int cport) {
 
         System.out.println("*** CONTROLLER STARTED ***");
@@ -101,103 +101,55 @@ public class Controller {
     public void handleNewConnection(Socket connection,BufferedReader in) throws IOException, InterruptedException {
         String line;
         // listen new connection first message
-        while((line = in.readLine()) != null) {
+        // label the loop to break it in switch
+        newConnection : while((line = in.readLine()) != null) {
             String[] splittedMessage = line.split(" ");
 
+            // keep in mind the connections should continue listening in each case
             switch (splittedMessage[0]) {
+
                 case (Protocol.JOIN_TOKEN) -> {
-                    handleDstoreConnection();
+                    communicator.displayReceivedMessage(connection,Integer.parseInt(splittedMessage[1]),line);
+                    connectDstore(connection,splittedMessage);
+                    break newConnection;
                 }
 
                 case ( Protocol.LIST_TOKEN) -> {
-                    handleClientConnection();
+                    communicator.displayReceivedMessage(connection,line);
+                    handleClientConnection(splittedMessage, connection);
                 }
 
-                case (Protocol.STORE_TOKEN) -> {
-                    if() {
-
-                    }
-                }
-
-                case (Protocol.LOAD_TOKEN) -> {
-                    if() {
-
-                    }
-                }
-                case (Protocol.REMOVE_TOKEN) -> {
-                    if() {
-
+                case (Protocol.STORE_TOKEN), (Protocol.LOAD_TOKEN), (Protocol.REMOVE_TOKEN) -> {
+                    communicator.displayReceivedMessage(connection,line);
+                    if(dstorePortsList.size() >= R) {
+                        storeLatch = new CountDownLatch(R);
+                        removeLatch = new CountDownLatch(R);
+                        handleClientConnection(splittedMessage,connection);
+                    } else {
+                        System.out.println("-> ERROR : NOT_ENOUGH_DSTORES");
+                        communicator.sendMessage(connection, Protocol.ERROR_NOT_ENOUGH_DSTORES_TOKEN);
+                        connection.close();
+                        System.out.println("-> CLIENT [" + connection.getPort() + "] DISCONNECTED");
                     }
                 }
 
                 default -> {
-
+                    communicator.displayReceivedMessage(connection,line);
+                    System.out.println("-> UNKNOWN MESSAGE RECEIVED FROM [" + connection.getPort() + "]");
                 }
-            }
 
             }
+
+            // after the first message break the while
+
+        }
     }
 
-//    public void handleNewConnection(Socket connection,BufferedReader in) throws IOException, InterruptedException {
-//        String line;
-//        // start listening from one connection
-//        while((line = in.readLine()) != null) {
-//            String[] splittedMessage = line.split(" ");
-//            if (splittedMessage[0].equals(Protocol.JOIN_TOKEN)) {
-//                Integer port = Integer.parseInt(splittedMessage[1]);
-//                dstorePortsList.add(port);
-//                dstoresPortsEquivalent.put(connection.getPort(),port);
-//                communicator.displayReceivedMessage(connection,port,line);
-//                // communicator.displayConnectionMessage(connection,line);
-//                System.out.println("-> [" + port + "] JOINED");
-//                if (dstorePortsList.size() >= R ) {
-//                    System.out.println("*** CLIENT REQUESTS OPEN ***");
-//                }
-//                new Thread(() -> {
-//                    try {
-//                        dstoresConnectionsList.add(connection);
-//                        // continue listening to the dstore messages
-//                        handleDstoreConnection(connection);
-//
-//                        // handle dstore disconnection
-//                        dstoresPortsEquivalent.remove(connection.getPort());
-//                        System.out.println("-> [" + port + "] DISCONNECTED");
-//                        dstorePortsList.remove(port);
-//                    } catch (IOException e) {
-//                        throw new RuntimeException(e);
-//                    }
-//                }).start();
-//                // stop listening to other messages from same connection
-//                break;
-//            } else {
-//                communicator.displayReceivedMessage(connection,line);
-//                if(dstorePortsList.size() >= R) {
-//                    if (communicator.receiveAnyMessage(splittedMessage).equals("CLIENT")){
-//                        storeLatch = new CountDownLatch(R);
-//                        removeLatch = new CountDownLatch(R);
-//
-//                        new Thread(() -> {
-//                            try {
-//                                handleClientMessage(splittedMessage, connection);
-//                            } catch (IOException | InterruptedException e) {
-//                                System.out.println("ERRRRRRRRRRRRRRRRRRRRRROOOOOOORRRRRRRRRR");
-//                                throw new RuntimeException(e);
-//                            }
-//                        }).start();
-//                        // stop listening to other messages from same connection
-//                        // break;
-//                    }
-//                } else if (communicator.receiveAnyMessage(splittedMessage).equals("CLIENT")) {
-//                    System.out.println("-> ERROR : not enough dstores connected");
-//                    communicator.sendMessage(connection, Protocol.ERROR_NOT_ENOUGH_DSTORES_TOKEN);
-//                    connection.close();
-//                }
-//                System.out.println("-> CLIENT DISCONNECTED");
-//            }
-//        }
-//    }
 
-    public void handleClientMessage(String[] splittedMessage, Socket connection) throws IOException, InterruptedException {
+    ///    CLIENT  ////
+
+
+    public void handleClientConnection(String[] splittedMessage, Socket connection) throws IOException, InterruptedException {
 
         switch (splittedMessage[0]) {
 
@@ -208,7 +160,7 @@ public class Controller {
                     index.put(splittedMessage[1], "STORE_IN_PROGRESS");
                     // handle store in another method
                     handleStore(connection,splittedMessage);
-                    System.out.println("-> SYSTEM TIMEOUT WAITING ALL ACK FROM DSTORES");
+                    System.out.println("-> ERROR SYSTEM TIMEOUT : WAITING ALL ACK FROM DSTORES");
                     // once all ACK messages are received , we know for sure that the stored is completed ,so we modify the index
                     if (storeLatch.await(timeout, TimeUnit.MILLISECONDS) && fileDistributionInDstoresMap.get(splittedMessage[1]).size() == R) {
                         index.put(splittedMessage[1],"STORE_COMPLETED");
@@ -258,28 +210,19 @@ public class Controller {
             }
 
             case Protocol.LIST_TOKEN -> {
-
                 for(Socket eachDstore : dstoresConnectionsList) {
                     eachDstore.close();
                 }
-
                 String fileList = "";
-                // System.out.println(fileDistributionInDstoresMap.keySet());
 
                 for ( String key : fileDistributionInDstoresMap.keySet() ) {
-                    if (fileList == "") {
+                    if (Objects.equals(fileList, "")) {
                         fileList = key;
                     } else {
                         fileList = key + " " + fileList;
                     }
                 }
-
                 communicator.sendMessage(connection,Protocol.LIST_TOKEN + " " + fileList);
-
-//                File f = new File ("/Users/macbookpro/Documents/My Programming Projects/DistributedFileSystemStorage/src");
-//
-//                communicator.sendMessage(connection, Arrays.toString(f.listFiles()));
-
             }
 
             default -> {
@@ -311,9 +254,9 @@ public class Controller {
         // check if the file is in any dstore
         //System.out.println(fileDistributionInDstoresMap.containsKey(filename));
         if (fileDistributionInDstoresMap.containsKey(filename)) {
-            reloadCounter++;
             ArrayList<Integer> dstoresFileList = fileDistributionInDstoresMap.get(filename);
             int pos = dstoresFileList.get(0) + reloadCounter;
+            reloadCounter++;
             communicator.sendMessage(connection,Protocol.LOAD_FROM_TOKEN+ " " + pos + " " + fileSizeMap.get(filename));
         } else {
             // TODO : what if the index is different from where the files are stored
@@ -342,6 +285,41 @@ public class Controller {
     }
 
 
+
+    ///    DSTORES  ////
+
+
+
+    private void connectDstore(Socket connection, String[] splittedMessage) {
+
+        // store the port
+        Integer port = Integer.parseInt(splittedMessage[1]);
+        dstorePortsList.add(port);
+        // dstores send messages on a random port, so keep track of the socket port and the random port
+        // map the real port with the cw spec PORT
+        dstoresPortsEquivalent.put(connection.getPort(),port);
+        System.out.println("-> [" + port + "] JOINED");
+        if (dstorePortsList.size() >= R ) {
+            System.out.println("*** CLIENT REQUESTS OPEN ***");
+        }
+        //new Thread(() -> {
+        try {
+            dstoresConnectionsList.add(connection);
+            // continue listening to the dstore messages
+            handleDstoreConnection(connection);
+
+            // handle dstore disconnection
+            dstoresPortsEquivalent.remove(connection.getPort());
+            System.out.println("-> [" + port + "] DISCONNECTED");
+            dstorePortsList.remove(port);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        //}).start();
+
+    }
+
+
     public void handleDstoreConnection(Socket connection) throws IOException {
 
         try {
@@ -349,6 +327,8 @@ public class Controller {
                     new InputStreamReader(connection.getInputStream())
             );
             String line;
+
+            // start listening again to teh dstore connection
             while ((line = in.readLine()) != null) {
                 communicator.displayReceivedMessage(connection,dstoresPortsEquivalent.get(connection.getPort()),line);
 
@@ -360,13 +340,13 @@ public class Controller {
                         if ( fileDistributionInDstoresMap.get(line.split(" ")[1]) == null) {
                             ArrayList<Integer> dstoresList = new ArrayList<>();
                             dstoresList.add(dstoresPortsEquivalent.get(connection.getPort()));
-                            System.out.println("-> FILE STORED TO : [" + dstoresPortsEquivalent.get(connection.getPort()) + "]");
                             fileDistributionInDstoresMap.put(line.split(" ")[1],dstoresList);
                         } else {
                             ArrayList<Integer> dstoresList = fileDistributionInDstoresMap.get(line.split(" ")[1]);
                             dstoresList.add(dstoresPortsEquivalent.get(connection.getPort()));
                             fileDistributionInDstoresMap.put(line.split(" ")[1],dstoresList);
                         }
+                        System.out.println("-> FILE STORED TO : [" + dstoresPortsEquivalent.get(connection.getPort()) + "]");
                         storeLatch.countDown();
                     }
 
@@ -396,6 +376,12 @@ public class Controller {
         }
 
     }
+
+
+
+    ///    MAIN  ////
+
+
 
     public static void main(String[] args){
         try{

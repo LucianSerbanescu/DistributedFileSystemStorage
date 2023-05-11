@@ -31,8 +31,3 @@ Connection established to port 2334
 Message sent to port 2334: LOAD_DATA file1.txt
 Loading file file1.txt from Dstore 2334
 Load operation of file file1.txt from Dstore 2334 successfully completed
-Message sent to port 4333: LIST
-List operation started
-Message received from port 4333: [/Users/macbookpro/Documents/My Programming Projects/DistributedFileSystemStorage/src/Protocol.class, /Users/macbookpro/Documents/My Programming Projects/DistributedFileSystemStorage/src/file1.txt, /Users/macbookpro/Documents/My Programming Projects/DistributedFileSystemStorage/src/.DS_Store, /Users/macbookpro/Documents/My Programming Projects/DistributedFileSystemStorage/src/Communicator.java, /Users/macbookpro/Documents/My Programming Projects/DistributedFileSystemStorage/src/Protocol.java, /Users/macbookpro/Documents/My Programming Projects/DistributedFileSystemStorage/src/folder2, /Users/macbookpro/Documents/My Programming Projects/DistributedFileSystemStorage/src/folder3, /Users/macbookpro/Documents/My Programming Projects/DistributedFileSystemStorage/src/Controller.class, /Users/macbookpro/Documents/My Programming Projects/DistributedFileSystemStorage/src/Controller.java, /Users/macbookpro/Documents/My Programming Projects/DistributedFileSystemStorage/src/Communicator.class, /Users/macbookpro/Documents/My Programming Projects/DistributedFileSystemStorage/src/folder1, /Users/macbookpro/Documents/My Programming Projects/DistributedFileSystemStorage/src/DStore.java, /Users/macbookpro/Documents/My Programming Projects/DistributedFileSystemStorage/src/DStore.class]
-ERROR: Connection closed by the Controller
-List operation failed
