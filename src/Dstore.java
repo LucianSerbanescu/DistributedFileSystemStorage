@@ -1,9 +1,10 @@
 import java.io.*;
 import java.net.*;
 
-public class DStore {
+public class Dstore {
 
     private int cport;
+    private int port;
     private int R;
     private int timeout;
     private String getFile_folder;
@@ -17,7 +18,10 @@ public class DStore {
 
     private File fileFolder;
 
-    public DStore(int port, int cport, int timeout, String file_folder) throws IOException {
+    public Dstore(int port, int cport, int timeout, String file_folder) throws IOException {
+
+        this.cport = cport;
+        this.port = port;
 
         this.file_folder = file_folder;
         setupFileStore(file_folder);
@@ -37,11 +41,12 @@ public class DStore {
     }
 
     public void connectController (InetAddress localAddress, int cport, int port) {
+
         try {
             this.controllerConnection = new Socket(localAddress,cport);
 
             System.out.println("-> CONNECTION ESTABLISHED TO CONTROLLER [" + controllerConnection.getPort() + "]");
-            System.out.println("-> DSTORE REAL LOCAL PORT " + controllerConnection.getLocalPort());
+            System.out.println("-> ACTUAL LOCAL PORT DSTORE " + controllerConnection.getLocalPort());
             communicator.sendMessage(controllerConnection, Protocol.JOIN_TOKEN + " " + port);
             // System.out.println(Protocol.JOIN_TOKEN + " " + port + " SENT");
             System.out.println("[" + port + "]" + " -> " + "[" + cport + "] " + Protocol.JOIN_TOKEN);
@@ -66,7 +71,8 @@ public class DStore {
         );
         String line;
         while((line = in.readLine()) != null) {
-            System.out.println("-> RECEIVE : " + line);
+            // System.out.println("-> RECEIVE : " + line);
+            communicator.displayReceivedMessageInController(controllerConnection,line);
             String[] splittedMessage = line.split(" ");
 
             switch (splittedMessage[0]) {
@@ -96,10 +102,10 @@ public class DStore {
             for(;;){
                 try{
                     Socket clientConnection = serverSocket.accept();
+                    System.out.println("CLIENT [" + clientConnection.getPort() + "] ACCEPTED");
                     // every client is in a new thread
                     new Thread(() -> {
                         try {
-                            // TODO : Does not enter this method
                             this.handleClientConnection(clientConnection);
                         } catch (IOException e) {
                             throw new RuntimeException(e);
@@ -121,15 +127,17 @@ public class DStore {
 
         // check if the message is from a client
         String line;
-        while((line = in.readLine()) != null) {
-
-            communicator.displayReceivedMessage(clientConnection,cport,line);
+        // TODO : which while is more appropriate ?
+        // while((line = in.readLine()) != null) {
+        while (!clientConnection.isClosed()) {
+            line = in.readLine();
+            communicator.displayReceivedMessageInDstore(clientConnection,port,line);
             String[] splittedMessage = line.split(" ");
 
             switch (splittedMessage[0]) {
 
                 case Protocol.STORE_TOKEN -> {
-                    clientConnection.setSoTimeout(timeout);
+                    // clientConnection.setSoTimeout(timeout);
                     communicator.sendMessage(clientConnection, Protocol.ACK_TOKEN);
                     storeFile(clientConnection,fileFolder + "/" + splittedMessage[1]);
                     // notice that the connection to the controller is done in way before and stored in a class variable
@@ -138,25 +146,22 @@ public class DStore {
                 }
 
                 case Protocol.LOAD_DATA_TOKEN -> {
-                    clientConnection.setSoTimeout(timeout);
+                    // clientConnection.setSoTimeout(timeout);
                     loadFile(clientConnection,fileFolder + "/" + splittedMessage[1]);
-                    // TODO : listen for RELOAD if loading from previous dstore fails
                 }
 
                 // In REMOVE operation the dstore receives no messages form the client
 
-                case Protocol.LIST_TOKEN -> {
-
-                }
+                // IN LIST operation the dstore receives no messages form the client
 
                 default -> {
                     System.out.println("no switch case covered in handled new clientConnection");
                 }
             }
             // TODO : is this necessary ?
-            break;
+            // break;
         }
-
+        System.out.println("CLIENT [" + clientConnection.getPort() + "] DISCONNECTED");
     }
 
 
@@ -183,7 +188,7 @@ public class DStore {
         }
         // close all the connections
         in.close();
-        clientConnection.close();
+        // clientConnection.close();
         out.close();
        // }
     }
@@ -202,7 +207,9 @@ public class DStore {
             System.out.println("*");
             out.write(buf,0,buflen);
         }
-        inf.close(); clientConnection.close(); out.close();
+        inf.close();
+        // clientConnection.close();
+        out.close();
         System.out.println("-> LOAD FINISHED");
     }
 
@@ -236,7 +243,7 @@ public class DStore {
             String file_folder = args[3];
 
             // creating the dstore
-            DStore dstore = new DStore(port, cport, timeout, file_folder);
+            Dstore dstore = new Dstore(port, cport, timeout, file_folder);
         }
         catch(Exception e){
             System.out.println("Unable to create DStore.");

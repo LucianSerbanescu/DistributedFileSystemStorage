@@ -8,11 +8,11 @@ import java.net.Socket;
 
 public class Communicator {
 
-    public synchronized void displayReceivedMessage(Socket connection,Integer localPort, String message) {
+    public synchronized void displayReceivedMessageInController(Socket connection, Integer localPort, String message) {
         System.out.println("[" + localPort + "] -> [" + connection.getLocalPort() + "] : " + message);
     }
 
-    public synchronized void displayReceivedMessage(Socket connection, String message) {
+    public synchronized void displayReceivedMessageInController(Socket connection, String message) {
         System.out.println("[" + connection.getPort() + "] -> [" + connection.getLocalPort() + "] : " + message);
     }
 
@@ -20,6 +20,9 @@ public class Communicator {
         System.out.println("[" + connection.getLocalPort() + "] -> [" + connection.getPort() + "] : " + message);
     }
 
+    public synchronized void displayReceivedMessageInDstore(Socket connection, Integer localPort, String message) {
+        System.out.println("[" + connection.getPort() + "] -> [" +  localPort + "] : " + message);
+    }
 
     public synchronized void sendMessage(Socket connection , String message) {
 

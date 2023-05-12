@@ -27,33 +27,102 @@ public class ClientMain {
 			throw new RuntimeException("folderToUpload folder does not exist");
 
 
-		Client client = new Client(cport,timeout, Logger.LoggingType.ON_FILE_AND_TERMINAL);
-		client.connect();
+
+
+		// TEST THE CONCURRENCY
+		for ( int i = 0 ; i < 10 ;i++) {
+			System.out.println("OPENING CLIENT " + i);
+			int finalI = i;
+			new Thread(() -> {
+				try {
+					// OPEN CLIENT I
+					Client client = new Client(cport,timeout, Logger.LoggingType.ON_FILE_AND_TERMINAL);
+					client.connect();
+					// START LOOPING LIST FOR INFINITE
+					testClientConnection(client, finalI);
+				} catch (InterruptedException e) {
+					throw new RuntimeException(e);
+				} catch (IOException e) {
+					throw new RuntimeException(e);
+				}
+			}).start();
+			// testClientConnection(client,i);
+
+		}
+
+
+
+
+
+		// REMOTE VALIDATION TEST 1
+
+//		Client client = new Client(cport,timeout, Logger.LoggingType.ON_FILE_AND_TERMINAL);
+//		client.connect();
+		// removeValTest1(client,uploadFolder);
+
+
+
+
 
 
 		/// My tests :
+//
+//		testStore(client, uploadFolder);
+//
+//		testLoad(client);
+//
+//		testRemove(client);
+//
+//		testList(client);
+		// myTest1(client, uploadFolder);
 
-		testStore(client, uploadFolder);
 
-		testLoad(client);
 
-		// testRemove(client);
 
-		testList(client);
+
 
 		/// Tested provided by University
 
-		// launch a single client
+		//launch a single client
 		// testClient(cport, timeout, downloadFolder, uploadFolder);
 		
 		// launch a number of concurrent clients, each doing the same operations
-//		for (int i = 0; i < 10; i++) {
+//		for (int i = 0; i < 2; i++) {
 //			new Thread() {
 //				public void run() {
 //					test2Client(cport, timeout, downloadFolder, uploadFolder);
 //				}
 //			}.start();
 //		}
+	}
+
+	private static void testClientConnection(Client client,int i) throws InterruptedException {
+
+		// LOOP LIST EVERY ONE SECOND
+		// for(;;) {
+			Thread.sleep(1000);
+			client.send("LIST");
+		// }
+
+		// System.out.println("Client disconnected");
+
+	}
+
+	private static void removeValTest1(Client client, File uploadFolder) throws IOException {
+
+		client.list();
+		client.store(new File(uploadFolder + "/" + "small_file.jpg"));
+		client.store(new File(uploadFolder + "/" + "small_file.jpg"));
+		client.list();
+		client.load("small_file.jpg");
+
+	}
+
+	private static void myTest1(Client client,File uploadFolder) throws IOException {
+
+		client.list();
+		client.store(new File(uploadFolder + "/" + "file1.txt"));
+
 	}
 
 	private static void testList(Client client) throws IOException {
@@ -73,7 +142,7 @@ public class ClientMain {
 	private static void testLoad(Client client) throws IOException {
 
 		client.load( "file1.txt");
-		// client.wrongLoad("file1.txt",2);
+		// client.wrongLoad("file1.txt",3);
 
 	}
 
@@ -178,7 +247,7 @@ public class ClientMain {
 		int i = 0; 
 		for (String filename : list)
 			System.out.println("[" + i++ + "] " + filename);
-		
+
 		return list;
 	}
 	

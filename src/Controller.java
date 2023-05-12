@@ -4,8 +4,7 @@ import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
-import java.util.ArrayList;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -30,8 +29,13 @@ public class Controller {
 
     // keep track of file progress
     private ConcurrentHashMap<String,String> index;
+    // private Map<String, String> index;
 
-    // keep all the filesizes
+    // keep track how many reload tries were requested for one file
+    private ConcurrentHashMap<String,Integer> reloadTries;
+    // private Map<String, String> reloadTries;
+
+    // keep all the filesize
     private ConcurrentHashMap<String,String> fileSizeMap;
 
     // keep track of which dstore is each file
@@ -44,8 +48,6 @@ public class Controller {
     private CountDownLatch storeLatch;
     private CountDownLatch removeLatch ;
 
-    // keep track of how many times it tried to reaload
-    private int reloadCounter;
 
     // TODO : set timeouts everywhere
 
@@ -57,11 +59,15 @@ public class Controller {
         this.communicator = new Communicator();
 
         this.index = new ConcurrentHashMap<>();
+        //this.index = Collections. synchronizedMap(new HashMap<>());
+
         this.fileSizeMap = new ConcurrentHashMap<>();
-        this.dstorePortsList = new ArrayList<>();
         this.fileDistributionInDstoresMap = new ConcurrentHashMap<>();
-        this.dstoresConnectionsList = new ArrayList<>();
         this.dstoresPortsEquivalent = new ConcurrentHashMap<>();
+        this.reloadTries = new ConcurrentHashMap<>();
+
+        this.dstorePortsList = new ArrayList<>();
+        this.dstoresConnectionsList = new ArrayList<>();
 
         openServerSocket(cport);
 
@@ -75,52 +81,72 @@ public class Controller {
         System.out.println("*** CONTROLLER STARTED ***");
         // the Controller should always listen for new connections
         System.out.println("-> WAITING " + R + " DSTORES");
-        for(;;){
-            // listen to new connections forever
-            try (ServerSocket serverSocket = new ServerSocket(cport)) {
+        try {
+            ServerSocket serverSocket = new ServerSocket(cport);
+
+            for(;;){
+                // listen to new connections forever
+                // try {
                 Socket connection = serverSocket.accept();
                 // TODO : this might be helpful for more clients
                 new Thread(() -> {
                     try {
-                        BufferedReader in = new BufferedReader(
-                                new InputStreamReader(connection.getInputStream())
-                        );
-                        handleNewConnection(connection,in);
+                        handleNewConnection(connection);
                     } catch (IOException | InterruptedException e) {
+                        // throw new RuntimeException(e);
+                        e.printStackTrace();
                         System.out.println("-> ERROR : IN OPEN SERVERSOCKET METHOD");
-                        throw new RuntimeException(e);
                     }
                 }).start();
-            } catch(Exception e)  {
-                System.out.println("error in openServerSocket : " + e);
+                //} catch(Exception e)  {
+                //    System.out.println("error in openServerSocket : " + e);
+                //}
             }
+        } catch(Exception e)  {
+            e.printStackTrace();
+            System.out.println("error in openServerSocket : " + e);
         }
-
     }
 
-    public void handleNewConnection(Socket connection,BufferedReader in) throws IOException, InterruptedException {
+    // UP TO THIS POINT I SHOULD HAVE 10 THREADS WITH 10 BUFFERED REDEADERS + DSTORE THREAD
+    public void handleNewConnection(Socket connection) {
+        BufferedReader in = null;
+        try {
+            in = new BufferedReader(
+                    new InputStreamReader(connection.getInputStream()));
+        } catch (IOException e) {
+            System.out.println("ERROR : HANDLE NEW CONNECTION BUFFER READER");
+            e.printStackTrace();
+        }
         String line;
         // listen new connection first message
         // label the loop to break it in switch
-        newConnection : while((line = in.readLine()) != null) {
+        newConnection : while(true) {
+            try {
+                assert in != null;
+                if ((line = in.readLine()) == null) break;
+            } catch (IOException e) {
+                e.printStackTrace();
+                System.out.println("ERROR : LINE CAN'T BE READ IN");
+            }
             String[] splittedMessage = line.split(" ");
 
             // keep in mind the connections should continue listening in each case
             switch (splittedMessage[0]) {
 
                 case (Protocol.JOIN_TOKEN) -> {
-                    communicator.displayReceivedMessage(connection,Integer.parseInt(splittedMessage[1]),line);
+                    communicator.displayReceivedMessageInController(connection,Integer.parseInt(splittedMessage[1]),line);
                     connectDstore(connection,splittedMessage);
                     break newConnection;
                 }
 
                 case ( Protocol.LIST_TOKEN) -> {
-                    communicator.displayReceivedMessage(connection,line);
+                    communicator.displayReceivedMessageInController(connection,line);
                     handleClientConnection(splittedMessage, connection);
                 }
 
-                case (Protocol.STORE_TOKEN), (Protocol.LOAD_TOKEN), (Protocol.REMOVE_TOKEN) -> {
-                    communicator.displayReceivedMessage(connection,line);
+                case (Protocol.STORE_TOKEN), (Protocol.LOAD_TOKEN), (Protocol.REMOVE_TOKEN), (Protocol.RELOAD_TOKEN) -> {
+                    communicator.displayReceivedMessageInController(connection,line);
                     if(dstorePortsList.size() >= R) {
                         storeLatch = new CountDownLatch(R);
                         removeLatch = new CountDownLatch(R);
@@ -134,14 +160,11 @@ public class Controller {
                 }
 
                 default -> {
-                    communicator.displayReceivedMessage(connection,line);
-                    System.out.println("-> UNKNOWN MESSAGE RECEIVED FROM [" + connection.getPort() + "]");
+                    // communicator.displayReceivedMessage(connection,line);
+                    System.out.println("-> UNKNOWN MESSAGE RECEIVED FROM [" + connection.getPort() + "] : " + line);
                 }
 
             }
-
-            // after the first message break the while
-
         }
     }
 
@@ -160,14 +183,13 @@ public class Controller {
                     index.put(splittedMessage[1], "STORE_IN_PROGRESS");
                     // handle store in another method
                     handleStore(connection,splittedMessage);
-                    System.out.println("-> ERROR SYSTEM TIMEOUT : WAITING ALL ACK FROM DSTORES");
                     // once all ACK messages are received , we know for sure that the stored is completed ,so we modify the index
                     if (storeLatch.await(timeout, TimeUnit.MILLISECONDS) && fileDistributionInDstoresMap.get(splittedMessage[1]).size() == R) {
                         index.put(splittedMessage[1],"STORE_COMPLETED");
                         fileSizeMap.put(splittedMessage[1],splittedMessage[2]);
                         communicator.sendMessage(connection, Protocol.STORE_COMPLETE_TOKEN);
                     } else {
-                        System.out.println("-> ERROR TIMEOUT : THE FILE WAS NOT STORED SUCCESSFULLY ");
+                        System.out.println("-> ERROR SYSTEM TIMEOUT : WAITING ALL ACK FROM DSTORES");
                         index.remove(splittedMessage[1]);
                         // TODO : what if the file don't exist as a key to be removed
                         fileDistributionInDstoresMap.remove(splittedMessage[1]);
@@ -176,7 +198,6 @@ public class Controller {
             }
 
             case Protocol.LOAD_TOKEN -> {
-                reloadCounter = 0;
                 handleLoad(connection,splittedMessage);
             }
 
@@ -186,19 +207,19 @@ public class Controller {
 
             case Protocol.REMOVE_TOKEN -> {
                 if (index.containsKey(splittedMessage[1])) {
-
+                    index.put(splittedMessage[1],"REMOVE_IN_PROGRESS");
                     for (Socket eachDstoreConnection : dstoresConnectionsList) {
                         // send only to the connections that contains the files
                         if(fileDistributionInDstoresMap.get(splittedMessage[1]).contains(dstoresPortsEquivalent.get(eachDstoreConnection.getPort()))) {
                             communicator.sendMessage(eachDstoreConnection,Protocol.REMOVE_TOKEN + " " + splittedMessage[1]);
                         }
                     }
-                    if (removeLatch.await(timeout,TimeUnit.MILLISECONDS)) {
+                    if (removeLatch.await(timeout,TimeUnit.MILLISECONDS) && fileDistributionInDstoresMap.get(splittedMessage[1]).size() == 0) {
+                        // TODO : should I put "remove_competed" ?
                         index.remove(splittedMessage[1]);
-                        fileDistributionInDstoresMap.remove(splittedMessage[1]);
                         fileSizeMap.remove(splittedMessage[1]);
                         communicator.sendMessage(connection,Protocol.REMOVE_COMPLETE_TOKEN);
-
+                        communicator.displaySentMessage(connection,"LIST SENT");
                     } else {
                         // TODO : check the else branch
                         System.out.println("-> ERROR TIMEOUT : THE FILE WAS NOT REMOVED SUCCESFULLY");
@@ -210,9 +231,7 @@ public class Controller {
             }
 
             case Protocol.LIST_TOKEN -> {
-                for(Socket eachDstore : dstoresConnectionsList) {
-                    eachDstore.close();
-                }
+
                 String fileList = "";
 
                 for ( String key : fileDistributionInDstoresMap.keySet() ) {
@@ -223,6 +242,7 @@ public class Controller {
                     }
                 }
                 communicator.sendMessage(connection,Protocol.LIST_TOKEN + " " + fileList);
+                System.out.println("-> LIST SENT TO [" + connection.getPort() + "]" );
             }
 
             default -> {
@@ -246,20 +266,18 @@ public class Controller {
         }
         communicator.sendMessage(connection, Protocol.STORE_TO_TOKEN + " " + storeToList);
 
-
     }
 
     public void handleLoad (Socket connection , String[] splittedMessage) {
         String filename = splittedMessage[1];
         // check if the file is in any dstore
-        //System.out.println(fileDistributionInDstoresMap.containsKey(filename));
         if (fileDistributionInDstoresMap.containsKey(filename)) {
             ArrayList<Integer> dstoresFileList = fileDistributionInDstoresMap.get(filename);
-            int pos = dstoresFileList.get(0) + reloadCounter;
-            reloadCounter++;
-            communicator.sendMessage(connection,Protocol.LOAD_FROM_TOKEN+ " " + pos + " " + fileSizeMap.get(filename));
+            reloadTries.put(filename,0);
+            int port = dstoresFileList.get(0);
+            communicator.sendMessage(connection,Protocol.LOAD_FROM_TOKEN+ " " + port + " " + fileSizeMap.get(filename));
         } else {
-            // TODO : what if the index is different from where the files are stored
+            System.out.println("ERROR : LOAD");
             communicator.sendMessage(connection, Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
         }
     }
@@ -267,20 +285,22 @@ public class Controller {
     public void handleReload (Socket connection, String[] splittedMessage) {
         String filename = splittedMessage[1];
         // check if the file is in any dstore
-        // System.out.println(fileDistributionInDstoresMap.containsKey(filename));
         if (fileDistributionInDstoresMap.containsKey(filename)) {
-            reloadCounter++;
+            int counter = reloadTries.get(filename) + 1;
+            reloadTries.put(filename,counter);
             ArrayList<Integer> dstoresFileList = fileDistributionInDstoresMap.get(filename);
-            int pos = dstoresFileList.get(0) + reloadCounter;
-            if ( pos < dstoresFileList.size()) {
-                communicator.sendMessage(connection,Protocol.LOAD_FROM_TOKEN+ " " + pos + " " + fileSizeMap.get(filename));
-
+            if ( reloadTries.get(filename) < dstoresFileList.size() ) {
+                int port = dstoresFileList.get(reloadTries.get(filename));
+                communicator.sendMessage(connection,Protocol.LOAD_FROM_TOKEN+ " " + port + " " + fileSizeMap.get(filename));
             } else {
+                System.out.println("ERROR : RELOAD");
                 communicator.sendMessage(connection,Protocol.ERROR_LOAD_TOKEN);
             }
         } else {
             // TODO : what if the index is different from where the files are stored
-            communicator.sendMessage(connection, Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
+            // communicator.sendMessage(connection, Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
+            System.out.println("-> ERROR : FILE DOES NOT EXIST AFTER RELOAD REQUEST");
+            System.out.println("** THIS SHOULDN'T HAPPEN **");
         }
     }
 
@@ -327,11 +347,9 @@ public class Controller {
                     new InputStreamReader(connection.getInputStream())
             );
             String line;
-
-            // start listening again to teh dstore connection
+            // continue listening to new dstore messages
             while ((line = in.readLine()) != null) {
-                communicator.displayReceivedMessage(connection,dstoresPortsEquivalent.get(connection.getPort()),line);
-
+                communicator.displayReceivedMessageInController(connection,dstoresPortsEquivalent.get(connection.getPort()),line);
                 switch (line.split(" ")[0]) {
 
                     case Protocol.STORE_ACK_TOKEN ->  {
@@ -353,9 +371,11 @@ public class Controller {
                     // Dstore do not communicate with controller in LOAD operation
 
                     case Protocol.REMOVE_ACK_TOKEN ->  {
-
+                        // TODO : get the distribution and start deleting from it
+                        ArrayList<Integer> dstoresList = fileDistributionInDstoresMap.get(line.split(" ")[1]);
+                        dstoresList.remove(dstoresPortsEquivalent.get(connection.getPort()));
+                        fileDistributionInDstoresMap.put(line.split(" ")[1],dstoresList);
                         removeLatch.countDown();
-
                     }
 
                     // Dstore do not communicate with controller in LIST operation
@@ -366,12 +386,13 @@ public class Controller {
                         System.out.println(line.split(" ")[0]);
                         System.out.println("I didn't received the ACK message");
                     }
+
                 }
             }
         } catch (SocketTimeoutException e) {
             System.out.println("Timeout expired in handleDstoreConnection");
         } catch (IOException e) {
-            System.out.println("Error produced in listening if the file has been stored");
+            System.out.println("ERROR : DSTORE COULD NOT SEND ACK");
             throw new RuntimeException(e);
         }
 
