@@ -28,9 +28,22 @@ public class ClientMain {
 
 
 
+		// REMOTE VALIDATION TEST 1
+
+//		Client client = new Client(cport,timeout, Logger.LoggingType.ON_FILE_AND_TERMINAL);
+//		client.connect();
+//		testList(client);
+//
+//		Client client1 = new Client(cport,timeout, Logger.LoggingType.ON_FILE_AND_TERMINAL);
+//		client1.connect();
+//		testList(client1);
+//		// removeValTest1(client,uploadFolder);
+
+
+
 
 		// TEST THE CONCURRENCY
-		for ( int i = 0 ; i < 10 ;i++) {
+		for ( int i = 0 ; i < 1 ;i++) {
 			System.out.println("OPENING CLIENT " + i);
 			int finalI = i;
 			new Thread(() -> {
@@ -46,19 +59,11 @@ public class ClientMain {
 					throw new RuntimeException(e);
 				}
 			}).start();
-			// testClientConnection(client,i);
+			 // testClientConnection(client,i);
 
 		}
 
 
-
-
-
-		// REMOTE VALIDATION TEST 1
-
-//		Client client = new Client(cport,timeout, Logger.LoggingType.ON_FILE_AND_TERMINAL);
-//		client.connect();
-		// removeValTest1(client,uploadFolder);
 
 
 
@@ -94,6 +99,13 @@ public class ClientMain {
 //				}
 //			}.start();
 //		}
+
+
+
+
+
+
+
 	}
 
 	private static void testClientConnection(Client client,int i) throws InterruptedException {
@@ -126,13 +138,13 @@ public class ClientMain {
 	}
 
 	private static void testList(Client client) throws IOException {
-
+		client.list();
 	}
 
 
 	private static void testStore(Client client, File uploadFolder) throws IOException {
 
-
+		client.list();
 		client.store(new File(uploadFolder + "/" + "file1.txt"));
 		// client.wrongStore("file.txt",new byte[100]);
 
