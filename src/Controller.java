@@ -117,6 +117,7 @@ public class Controller {
         } catch (IOException e) {
             System.out.println("ERROR : HANDLE NEW CONNECTION BUFFER READER");
             e.printStackTrace();
+            return;
         }
         String line = null;
         // listen new connection first message
@@ -125,66 +126,72 @@ public class Controller {
         // newConnection : while((line = in.readLine()) != null) {
 
         // TODO : HERE IS THE PROBLEM
-        newConnection : while(true) {
-            try {
-                assert in != null;
-                if ((line = in.readLine()) == null) break;
-            } catch (IOException e) {
-                e.printStackTrace();
-                System.out.println("ERROR : LINE CAN'T BE READ IN");
-            }
+        try {
+            newConnection : while((line = in.readLine()) != null) {
+                System.out.println("Received request: " + line);
+                /*try {
+                    assert in != null;
+                    if ((line = in.readLine()) == null) break;
+                } catch (IOException e) {
+                    System.out.println("ERROR : LINE CAN'T BE READ IN");
+                    e.printStackTrace();
+                }*/
 
 
-            String[] splittedMessage = line.split(" ");
+                String[] splittedMessage = line.split(" ");
 
-            // keep in mind the connections should continue listening in each case
-            switch (splittedMessage[0]) {
+                // keep in mind the connections should continue listening in each case
+                switch (splittedMessage[0]) {
 
-                case (Protocol.JOIN_TOKEN) -> {
-                    communicator.displayReceivedMessageInController(connection,Integer.parseInt(splittedMessage[1]),line);
-                    connectDstore(connection,splittedMessage);
-                    break newConnection;
-                }
-
-                case ( Protocol.LIST_TOKEN) -> {
-                    communicator.displayReceivedMessageInController(connection,line);
-                    try {
-                        handleClientConnection(splittedMessage, connection);
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                        System.out.println("ERROR: CAN'T HANDLE CLIENT CONNECTION AFTER RECEIVED LIST_TOKEN");
+                    case (Protocol.JOIN_TOKEN) -> {
+                        communicator.displayReceivedMessageInController(connection,Integer.parseInt(splittedMessage[1]),line);
+                        connectDstore(connection,splittedMessage);
+                        break newConnection;
                     }
-                }
 
-                case (Protocol.STORE_TOKEN), (Protocol.LOAD_TOKEN), (Protocol.REMOVE_TOKEN), (Protocol.RELOAD_TOKEN) -> {
-                    communicator.displayReceivedMessageInController(connection,line);
-                    if(dstorePortsList.size() >= R) {
-                        storeLatch = new CountDownLatch(R);
-                        removeLatch = new CountDownLatch(R);
+                    case ( Protocol.LIST_TOKEN) -> {
+                        communicator.displayReceivedMessageInController(connection,line);
                         try {
                             handleClientConnection(splittedMessage, connection);
                         } catch (IOException e) {
                             throw new RuntimeException(e);
                         } catch (InterruptedException e) {
                             e.printStackTrace();
-                            System.out.println("ERROR: CAN'T HANDLE CLIENT CONNECTION AFTER RECEIVED ANY OF STORE / LOAD / RELOAD / REMOVE TOKEN");
-                        }                    } else {
-                        System.out.println("-> ERROR : NOT_ENOUGH_DSTORES");
-                        communicator.sendMessage(connection, Protocol.ERROR_NOT_ENOUGH_DSTORES_TOKEN);
-                        // CONNECTION SHOULD NOT BE CLOSED
-                        // connection.close();
-                        System.out.println("-> CLIENT [" + connection.getPort() + "] DISCONNECTED");
+                            System.out.println("ERROR: CAN'T HANDLE CLIENT CONNECTION AFTER RECEIVED LIST_TOKEN");
+                        }
                     }
-                }
 
-                default -> {
-                    // communicator.displayReceivedMessage(connection,line);
-                    System.out.println("-> UNKNOWN MESSAGE RECEIVED FROM [" + connection.getPort() + "] : " + line);
-                }
+                    case (Protocol.STORE_TOKEN), (Protocol.LOAD_TOKEN), (Protocol.REMOVE_TOKEN), (Protocol.RELOAD_TOKEN) -> {
+                        communicator.displayReceivedMessageInController(connection,line);
+                        if(dstorePortsList.size() >= R) {
+                            storeLatch = new CountDownLatch(R);
+                            removeLatch = new CountDownLatch(R);
+                            try {
+                                handleClientConnection(splittedMessage, connection);
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                                System.out.println("ERROR: CAN'T HANDLE CLIENT CONNECTION AFTER RECEIVED ANY OF STORE / LOAD / RELOAD / REMOVE TOKEN");
+                            }                    } else {
+                            System.out.println("-> ERROR : NOT_ENOUGH_DSTORES");
+                            communicator.sendMessage(connection, Protocol.ERROR_NOT_ENOUGH_DSTORES_TOKEN);
+                            // CONNECTION SHOULD NOT BE CLOSED
+                            // connection.close();
+                            System.out.println("-> CLIENT [" + connection.getPort() + "] DISCONNECTED");
+                        }
+                    }
 
+                    default -> {
+                        // communicator.displayReceivedMessage(connection,line);
+                        System.out.println("-> UNKNOWN MESSAGE RECEIVED FROM [" + connection.getPort() + "] : " + line);
+                    }
+
+                }
             }
+        }
+        catch (IOException w) {
+            System.out.println("Connection Reset");
         }
     }
 

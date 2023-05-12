@@ -43,23 +43,31 @@ public class ClientMain {
 
 
 		// TEST THE CONCURRENCY
-		for ( int i = 0 ; i < 1 ;i++) {
-			System.out.println("OPENING CLIENT " + i);
-			int finalI = i;
-			new Thread(() -> {
-				try {
-					// OPEN CLIENT I
-					Client client = new Client(cport,timeout, Logger.LoggingType.ON_FILE_AND_TERMINAL);
-					client.connect();
-					// START LOOPING LIST FOR INFINITE
-					testClientConnection(client, finalI);
-				} catch (InterruptedException e) {
-					throw new RuntimeException(e);
-				} catch (IOException e) {
-					throw new RuntimeException(e);
-				}
-			}).start();
+//		for ( int i = 0 ; i < 10 ;i++) {
+//			System.out.println("OPENING CLIENT " + i);
+//			int finalI = i;
+//			new Thread(() -> {
+//				try {
+//					// OPEN CLIENT I
+//					Client client = new Client(cport,timeout, Logger.LoggingType.ON_FILE_AND_TERMINAL);
+//					client.connect();
+//					// START LOOPING LIST FOR INFINITE
+//					testClientConnection(client, finalI);
+//				} catch (InterruptedException e) {
+//					throw new RuntimeException(e);
+//				} catch (IOException e) {
+//					throw new RuntimeException(e);
+//				}
+//			}).start();
 			 // testClientConnection(client,i);
+
+		for (int i = 0; i < 2; i++) {
+			new Thread() {
+				public void run() {
+					test2Client(cport, timeout, downloadFolder, uploadFolder);
+				}
+			}.start();
+		}
 
 		}
 
@@ -92,13 +100,6 @@ public class ClientMain {
 		// testClient(cport, timeout, downloadFolder, uploadFolder);
 		
 		// launch a number of concurrent clients, each doing the same operations
-//		for (int i = 0; i < 2; i++) {
-//			new Thread() {
-//				public void run() {
-//					test2Client(cport, timeout, downloadFolder, uploadFolder);
-//				}
-//			}.start();
-//		}
 
 
 
@@ -106,7 +107,8 @@ public class ClientMain {
 
 
 
-	}
+
+	//}
 
 	private static void testClientConnection(Client client,int i) throws InterruptedException {
 
