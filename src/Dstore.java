@@ -22,6 +22,7 @@ public class Dstore {
 
         this.cport = cport;
         this.port = port;
+        this.timeout = timeout;
 
         this.file_folder = file_folder;
         setupFileStore(file_folder);
@@ -78,7 +79,7 @@ public class Dstore {
             switch (splittedMessage[0]) {
 
                 case Protocol.REMOVE_TOKEN -> {
-                    // detlete file from dstore folder
+                    // delete file from dstore folder
                     File file = new File((fileFolder + "/" + splittedMessage[1]));
                     if (file.delete()) {
                         System.out.println("-> FILE " + splittedMessage[1] + " DELETED");
@@ -137,7 +138,7 @@ public class Dstore {
             switch (splittedMessage[0]) {
 
                 case Protocol.STORE_TOKEN -> {
-                    // clientConnection.setSoTimeout(timeout);
+                    clientConnection.setSoTimeout(timeout);
                     communicator.sendMessage(clientConnection, Protocol.ACK_TOKEN);
                     storeFile(clientConnection,fileFolder + "/" + splittedMessage[1]);
                     // notice that the connection to the controller is done in way before and stored in a class variable
@@ -146,13 +147,13 @@ public class Dstore {
                 }
 
                 case Protocol.LOAD_DATA_TOKEN -> {
-                    // clientConnection.setSoTimeout(timeout);
+                    clientConnection.setSoTimeout(timeout);
                     loadFile(clientConnection,fileFolder + "/" + splittedMessage[1]);
                 }
 
                 // In REMOVE operation the dstore receives no messages form the client
 
-                // IN LIST operation the dstore receives no messages form the client
+                // In LIST operation the dstore receives no messages form the client
 
                 default -> {
                     System.out.println("no switch case covered in handled new clientConnection");

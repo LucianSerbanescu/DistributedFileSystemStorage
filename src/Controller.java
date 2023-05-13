@@ -25,6 +25,8 @@ public class Controller {
 
     // keep ports of connected dstores
     private ArrayList<Integer> dstorePortsList;
+    // apparently the dstores sockets to the controller are different from server sockets, so I need to keep track of the real sockets and the ones given by me
+    private ConcurrentHashMap<Integer, Integer> dstoresPortsEquivalent;
 
     // keep a list with all the dstore connections
     private ArrayList<Socket> dstoresConnectionsList;
@@ -43,8 +45,7 @@ public class Controller {
     // keep track of which dstore is each file
     private ConcurrentHashMap<String, ArrayList<Integer>> fileDistributionInDstoresMap;
 
-    // apparently the dstores sockets to the controller are different from server sockets, so I need to keep track of the real sockets and the ones given by me
-    private ConcurrentHashMap<Integer, Integer> dstoresPortsEquivalent;
+
 
     private ConcurrentHashMap<String,CountDownLatch> storeLatchMap;
     private ConcurrentHashMap<String,CountDownLatch> removeLatchMap;
@@ -53,7 +54,7 @@ public class Controller {
     // private CountDownLatch removeLatch;
 
 
-    // TODO : set timeouts everywhere
+    // TODO : put a timeout into rebalance
 
     public Controller(int cport, int R, int timeout, int rebalance_period) {
 
@@ -63,7 +64,6 @@ public class Controller {
         this.communicator = new Communicator();
 
         this.index = new ConcurrentHashMap<>();
-        //this.index = Collections. synchronizedMap(new HashMap<>());
 
         this.fileSizeMap = new ConcurrentHashMap<>();
         this.fileDistributionInDstoresMap = new ConcurrentHashMap<>();
@@ -112,24 +112,10 @@ public class Controller {
             return;
         }
         String line;
-        // listen new connection first message
-        // label the loop to break it in switch
 
-        // newConnection : while(true) {
-
-        // TODO : HERE IS THE PROBLEM
-        // TODO : the try and catch does solve the prolem
         try {
             newConnection: while ((line = in.readLine()) != null) {
                 System.out.println("Received request: " + line);
-                /*try {
-                    assert in != null;
-                    if ((line = in.readLine()) == null) break;
-                } catch (IOException e) {
-                    System.out.println("ERROR : LINE CAN'T BE READ IN");
-                    e.printStackTrace();
-                }*/
-
 
                 String[] splittedMessage = line.split(" ");
 
@@ -343,18 +329,21 @@ public class Controller {
         System.out.println("-> [" + port + "] JOINED");
         if (dstorePortsList.size() >= R) {
             System.out.println("*** CLIENT REQUESTS OPEN ***");
+        } else {
+            System.out.println("*** CLIENT CONNECTION CLOSED ***");
         }
-        //new Thread(() -> {
+
         dstoresConnectionsList.add(connection);
+
         // continue listening to the dstore messages
         handleDstoreConnection(connection);
 
         // handle dstore disconnection
         dstoresPortsEquivalent.remove(connection.getPort());
-        System.out.println("-> [" + port + "] DISCONNECTED");
         dstorePortsList.remove(port);
-        //}).start();
-
+        System.out.println("-> [" + port + "] DISCONNECTED");
+        System.out.println("-> " + dstorePortsList.size() + " DSTORES REMAINED CONNECTED");
+        // TODO : handle all the lost files
     }
 
 
@@ -367,9 +356,10 @@ public class Controller {
             String line;
             // continue listening to new dstore messages
             while ((line = in.readLine()) != null) {
-                communicator.displayReceivedMessageInController(connection, dstoresPortsEquivalent.get(connection.getPort()), line);
-                switch (line.split(" ")[0]) {
 
+                communicator.displayReceivedMessageInController(connection, dstoresPortsEquivalent.get(connection.getPort()), line);
+
+                switch (line.split(" ")[0]) {
                     case Protocol.STORE_ACK_TOKEN -> {
                         // edit the dstores list by : find the value, get the value ,change the value, and put back teh value
                         // if the arraylist in the map is empty , put one , otherwise complete it
@@ -392,19 +382,14 @@ public class Controller {
                     // Dstore do not communicate with controller in LIST operation
 
                     default -> {
-                        // TODO : if you timeout
-                        // TODO : remove the file from store in progress / check the specs if you need to
-                        System.out.println(line.split(" ")[0]);
-                        System.out.println("I didn't received the ACK message");
+                        System.out.println("ERROR : UNKOWN MESSAGE RECEIVED FROM DSTORE : " + line);
                     }
-
                 }
+
             }
-        } catch (SocketTimeoutException e) {
-            System.out.println("Timeout expired in handleDstoreConnection");
         } catch (IOException e) {
-            System.out.println("ERROR : DSTORE COULD NOT SEND ACK");
-            throw new RuntimeException(e);
+            e.printStackTrace();
+            System.out.println("ERROR : CAN'T LISTEN TO DSTORE");
         }
 
     }
