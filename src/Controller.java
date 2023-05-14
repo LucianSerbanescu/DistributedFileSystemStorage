@@ -23,10 +23,12 @@ public class Controller {
     private final Communicator communicator;
 
 
+    // TODO : optimisie this
     // keep ports of connected dstores
     private ArrayList<Integer> dstorePortsList;
     // apparently the dstores sockets to the controller are different from server sockets, so I need to keep track of the real sockets and the ones given by me
     private ConcurrentHashMap<Integer, Integer> dstoresPortsEquivalent;
+
 
     // keep a list with all the dstore connections
     private ArrayList<Socket> dstoresConnectionsList;
@@ -44,6 +46,10 @@ public class Controller {
 
     // keep track of which dstore is each file
     private ConcurrentHashMap<String, ArrayList<Integer>> fileDistributionInDstoresMap;
+    // keep track of what files are on each port, I am going to use dstores real ports (connection.getPort)
+    private ConcurrentHashMap<Integer, ArrayList<String>> dstoreContent;
+    // keep track of number of files
+    // private ConcurrentHashMap<Integer,Integer> numberOfFilesInEachDstore;
 
 
 
@@ -67,6 +73,8 @@ public class Controller {
 
         this.fileSizeMap = new ConcurrentHashMap<>();
         this.fileDistributionInDstoresMap = new ConcurrentHashMap<>();
+        this.dstoreContent = new ConcurrentHashMap<>();
+        // this.numberOfFilesInEachDstore = new ConcurrentHashMap<>();
         this.dstoresPortsEquivalent = new ConcurrentHashMap<>();
         this.reloadTries = new ConcurrentHashMap<>();
 
@@ -168,15 +176,13 @@ public class Controller {
                 if (Objects.equals(index.get(splittedMessage[1]), "REMOVE_IN_PROGRESS") || Objects.equals(index.get(splittedMessage[1]), "STORE_COMPLETED") || Objects.equals(index.get(splittedMessage[1]), "STORE_IN_PROGRESS")) {
                     communicator.sendMessage(connection, Protocol.ERROR_FILE_ALREADY_EXISTS_TOKEN);
                 } else {
-                    storeLatchMap.put(splittedMessage[1],new CountDownLatch(R));
                     index.put(splittedMessage[1], "STORE_IN_PROGRESS");
+                    storeLatchMap.put(splittedMessage[1],new CountDownLatch(R));
                     // handle store in another method
-                    // TODO get rid of that try
                     handleStore(connection, splittedMessage);
                     // once all ACK messages are received , we know for sure that the stored is completed ,so we modify the index
                     try {
                         if (storeLatchMap.get(splittedMessage[1]).await(timeout, TimeUnit.MILLISECONDS)) {
-                            //&& fileDistributionInDstoresMap.get(splittedMessage[1]).size() == R
                             index.put(splittedMessage[1], "STORE_COMPLETED");
                             fileSizeMap.put(splittedMessage[1], splittedMessage[2]);
                             communicator.sendMessage(connection, Protocol.STORE_COMPLETE_TOKEN);
@@ -225,7 +231,6 @@ public class Controller {
                             communicator.sendMessage(connection, Protocol.REMOVE_COMPLETE_TOKEN);
                             communicator.displaySentMessage(connection, "LIST SENT");
                         } else {
-                            // TODO : check the else branch
                             System.out.println("-> ERROR TIMEOUT : THE FILE WAS NOT REMOVED SUCCESFULLY");
                         }
                     } catch (InterruptedException e) {
@@ -242,16 +247,17 @@ public class Controller {
 
                 String fileList = "";
 
-                for ( String key : fileDistributionInDstoresMap.keySet() ) {
-                    if (Objects.equals(fileList, "")) {
-                        fileList = key;
-                    } else {
-                        fileList = key + " " + fileList;
+                for ( String key : index.keySet() ) {
+                    if ( Objects.equals(index.get(key), "STORE_COMPLETED")) {
+                        if (Objects.equals(fileList, "")) {
+                            fileList = key;
+                        } else {
+                            fileList = key + " " + fileList;
+                        }
                     }
                 }
                 communicator.sendMessage(connection,Protocol.LIST_TOKEN + " " + fileList);
                 System.out.println("-> LIST SENT TO [" + connection.getPort() + "]" );
-
             }
 
             default -> {
@@ -265,16 +271,44 @@ public class Controller {
     public void handleStore(Socket connection, String[] splittedMessage) {
 
         // TODO: need to change the way Controller picks the Dstores where the file will be stored
+
+        // Create a list to hold the entries of the ConcurrentHashMap
+        List<Map.Entry<Integer, ArrayList<String>>> entryList = new ArrayList<>(dstoreContent.entrySet());
+
+        // Sort the entryList based on the size of the ArrayLists
+        entryList.sort(Comparator.comparingInt(entry -> entry.getValue().size()));
+
         StringBuilder storeToList = new StringBuilder();
-        for (int i = 0; i < dstorePortsList.size(); i++) {
-            if (i == dstorePortsList.size() - 1) {
-                storeToList.append(dstorePortsList.get(i));
+
+        int count = 0;
+        for (Map.Entry<Integer, ArrayList<String>> entry : entryList) {
+            int port = entry.getKey();
+            if (count < R - 1) {
+                storeToList.append(dstoresPortsEquivalent.get(port)).append(" ");
+                count++;
+            } else if (count == R - 1){
+                storeToList.append(dstoresPortsEquivalent.get(port));
+                count++;
             } else {
-                storeToList.append(dstorePortsList.get(i)).append(" ");
+                break;
             }
         }
+
         this.fileDistributionInDstoresMap.putIfAbsent(splittedMessage[1], new ArrayList<>());
+        System.out.println("-> SELECTED PORTS FOR STORING : " + storeToList);
         communicator.sendMessage(connection, Protocol.STORE_TO_TOKEN + " " + storeToList);
+
+
+        // store on first dstores
+//        StringBuilder storeToList = new StringBuilder();
+//        for (int i = 0; i < R; i++) {
+//            if (i == dstorePortsList.size() - 1) {
+//                storeToList.append(dstorePortsList.get(i));
+//            } else {
+//                storeToList.append(dstorePortsList.get(i)).append(" ");
+//            }
+//        }
+
 
     }
 
@@ -326,6 +360,8 @@ public class Controller {
         // dstores send messages on a random port, so keep track of the socket port and the random port
         // map the real port with the cw spec PORT
         dstoresPortsEquivalent.put(connection.getPort(), port);
+        dstoreContent.put(connection.getPort(), new ArrayList<>());
+        // numberOfFilesInEachDstore.put(port,0);
         System.out.println("-> [" + port + "] JOINED");
         if (dstorePortsList.size() >= R) {
             System.out.println("*** CLIENT REQUESTS OPEN ***");
@@ -368,6 +404,10 @@ public class Controller {
                             value.add(dstoresPortsEquivalent.get(connection.getPort()));
                             return value;
                         });
+
+                        ArrayList<String> files = dstoreContent.get(connection.getPort());
+                        files.add(filename);
+                        dstoreContent.put(connection.getPort(),files);
 
                         System.out.println("-> FILE STORED TO : [" + dstoresPortsEquivalent.get(connection.getPort()) + "]");
                         storeLatchMap.get(filename).countDown();

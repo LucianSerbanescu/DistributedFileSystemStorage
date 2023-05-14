@@ -31,9 +31,9 @@ public class ClientMain {
 
         // REMOTE VALIDATION TEST 1
 
-//		Client client = new Client(cport,timeout, Logger.LoggingType.ON_FILE_AND_TERMINAL);
-//		client.connect();
-//		testList(client);
+		Client client = new Client(cport,timeout, Logger.LoggingType.ON_FILE_AND_TERMINAL);
+		client.connect();
+		// testList(client);
 //
 //		Client client1 = new Client(cport,timeout, Logger.LoggingType.ON_FILE_AND_TERMINAL);
 //		client1.connect();
@@ -64,30 +64,46 @@ public class ClientMain {
             new Thread(() -> test2Client(cport, timeout, downloadFolder, uploadFolder)).start();
         }
 
-    }
 
 
-    /// My tests :
+
+        /// My tests :
 //
-//		testStore(client, uploadFolder);
+//        testStore(client, uploadFolder);
+//        client.list();
+//        client.store(new File(uploadFolder + "/" + "file3.txt"));
+//        client.list();
+//        client.store(new File(uploadFolder + "/" + "file4.txt"));
+//        client.list();
+//        client.store(new File(uploadFolder + "/" + "file2.txt"));
+//        client.list();
+//        client.store(new File(uploadFolder + "/" + "small_file.jpg"));
+//
+
 //
 //		testLoad(client);
 //
 //		testRemove(client);
 //
 //		testList(client);
-    // myTest1(client, uploadFolder);
+        // myTest1(client, uploadFolder);
 
 
-    /// Tested provided by University
+        /// Tested provided by University
 
-    //launch a single client
-    // testClient(cport, timeout, downloadFolder, uploadFolder);
+        //launch a single client
+        // testClient(cport, timeout, downloadFolder, uploadFolder);
 
-    // launch a number of concurrent clients, each doing the same operations
+        // launch a number of concurrent clients, each doing the same operations
 
 
-    //}
+
+
+    // end of class
+    }
+
+
+
 
     private static void testClientConnection(Client client, int i) throws InterruptedException {
 
