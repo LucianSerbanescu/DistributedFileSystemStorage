@@ -7,6 +7,7 @@ import java.net.SocketTimeoutException;
 import java.rmi.server.ExportException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -25,13 +26,13 @@ public class Controller {
 
     // TODO : optimisie this
     // keep ports of connected dstores
-    private ArrayList<Integer> dstorePortsList;
+    private CopyOnWriteArrayList<Integer> dstorePortsList;
     // apparently the dstores sockets to the controller are different from server sockets, so I need to keep track of the real sockets and the ones given by me
     private ConcurrentHashMap<Integer, Integer> dstoresPortsEquivalent;
 
 
     // keep a list with all the dstore connections
-    private ArrayList<Socket> dstoresConnectionsList;
+    private CopyOnWriteArrayList<Socket> dstoresConnectionsList;
 
     // keep track of file progress
     private ConcurrentHashMap<String, String> index;
@@ -78,8 +79,8 @@ public class Controller {
         this.dstoresPortsEquivalent = new ConcurrentHashMap<>();
         this.reloadTries = new ConcurrentHashMap<>();
 
-        this.dstorePortsList = new ArrayList<>();
-        this.dstoresConnectionsList = new ArrayList<>();
+        this.dstorePortsList = new CopyOnWriteArrayList<>();
+        this.dstoresConnectionsList = new CopyOnWriteArrayList<>();
 
         this.storeLatchMap = new ConcurrentHashMap<>();
         this.removeLatchMap = new ConcurrentHashMap<>();
@@ -143,6 +144,7 @@ public class Controller {
 
                     case (Protocol.STORE_TOKEN), (Protocol.LOAD_TOKEN), (Protocol.REMOVE_TOKEN), (Protocol.RELOAD_TOKEN) -> {
                         communicator.displayReceivedMessageInController(connection, line);
+//                        this.dstorePortsList.forEach(e -> System.err.println(e));
                         if (dstorePortsList.size() >= R) {
                             handleClientConnection(splittedMessage, connection);
                         } else {
@@ -173,7 +175,6 @@ public class Controller {
         switch (splittedMessage[0]) {
 
             case Protocol.STORE_TOKEN -> {
-                // if (Objects.equals(index.get(splittedMessage[1]), "REMOVE_IN_PROGRESS") || Objects.equals(index.get(splittedMessage[1]), "STORE_COMPLETED") || Objects.equals(index.get(splittedMessage[1]), "STORE_IN_PROGRESS") || (storeLatchMap.putIfAbsent(splittedMessage[1], new CountDownLatch(R)) != null) ) {
                 if((index.containsKey(splittedMessage[1]) && index.get(splittedMessage[1]) != null) || index.containsKey(splittedMessage[1]) || storeLatchMap.putIfAbsent(splittedMessage[1], new CountDownLatch(R)) != null ) {
                     communicator.sendMessage(connection, Protocol.ERROR_FILE_ALREADY_EXISTS_TOKEN);
                 } else {
@@ -217,15 +218,6 @@ public class Controller {
             case Protocol.REMOVE_TOKEN -> {
 
                  if (index.containsKey(splittedMessage[1]) && Objects.equals(index.get(splittedMessage[1]), "STORE_COMPLETED") && removeLatchMap.putIfAbsent(splittedMessage[1], new CountDownLatch(R)) == null ) {
-                // if (index.containsKey(splittedMessage[1]) && (removeLatchMap.putIfAbsent(splittedMessage[1], new CountDownLatch(R)) != null)  || index.get(splittedMessage[1]) == null || Objects.equals(index.get(splittedMessage[1]), "")) ) {
-                    // If a different thread is also removing at the same time, it may be here by the time you check for "REMOVE_IN_PROGRESS",
-                    // and you will have 2 remove operations simultaneously on the same file. this is more of a problem with store.
-                    // can solve this by doing this:
-
-                    /*
-                   index.putIfAbsent to chekc and put same time
-                     */
-                    //                 if (index.containsKey(splittedMessage[1]) && ( !Objects.equals(index.get(splittedMessage[1]), "REMOVE_IN_PROGRESS") || index.get(splittedMessage[1]) == null || Objects.equals(index.get(splittedMessage[1]), "")) ) {
 
                     index.put(splittedMessage[1], "REMOVE_IN_PROGRESS");
                     // removeLatchMap.put(splittedMessage[1],new CountDownLatch(R));
@@ -387,12 +379,16 @@ public class Controller {
 
         dstoresConnectionsList.add(connection);
 
+        var connectionPort = connection.getPort();
+
         // continue listening to the dstore messages
         handleDstoreConnection(connection);
 
         // handle dstore disconnection
-        dstoresPortsEquivalent.remove(connection.getPort());
+        dstoresPortsEquivalent.remove(connectionPort);
         dstorePortsList.remove(port);
+        dstoreContent.remove(connectionPort);
+        dstoresConnectionsList.remove(connection);
         System.out.println("-> [" + port + "] DISCONNECTED");
         System.out.println("-> " + dstorePortsList.size() + " DSTORES REMAINED CONNECTED");
         // TODO : handle all the lost files

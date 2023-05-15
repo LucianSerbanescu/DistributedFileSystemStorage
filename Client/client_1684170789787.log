@@ -1,0 +1,211 @@
+Connection established to port 12345
+Message sent to port 12345: LIST
+List operation started
+Message received from port 12345: LIST 
+List operation successfully completed
+Message sent to port 12345: STORE file1.txt 27
+Store operation started for file file1.txt
+Message received from port 12345: STORE_TO 2333 2335 2336
+Controller replied to store file1.txt in these Dstores: 2333 2335 2336 
+Connection established to port 2333
+Message sent to port 2333: STORE file1.txt 27
+Storing file file1.txt to Dstore 2333
+Message received from port 2333: ACK
+ACK received from Dstore 2333 to store file file1.txt
+Store of file file1.txt to Dstore 2333 successfully completed
+Connection established to port 2335
+Message sent to port 2335: STORE file1.txt 27
+Storing file file1.txt to Dstore 2335
+Message received from port 2335: ACK
+ACK received from Dstore 2335 to store file file1.txt
+Store of file file1.txt to Dstore 2335 successfully completed
+Connection established to port 2336
+Message sent to port 2336: STORE file1.txt 27
+Storing file file1.txt to Dstore 2336
+Message received from port 2336: ACK
+ACK received from Dstore 2336 to store file file1.txt
+Store of file file1.txt to Dstore 2336 successfully completed
+Message received from port 12345: STORE_COMPLETE
+Store operation for file file1.txt completed
+Message sent to port 12345: LIST
+List operation started
+Message received from port 12345: LIST file1.txt
+List operation successfully completed
+Message sent to port 12345: STORE file3.txt 6
+Store operation started for file file3.txt
+Message received from port 12345: STORE_TO 2334 2333 2335
+Controller replied to store file3.txt in these Dstores: 2334 2333 2335 
+Connection established to port 2334
+Message sent to port 2334: STORE file3.txt 6
+Storing file file3.txt to Dstore 2334
+Message received from port 2334: ACK
+ACK received from Dstore 2334 to store file file3.txt
+Store of file file3.txt to Dstore 2334 successfully completed
+Connection established to port 2333
+Message sent to port 2333: STORE file3.txt 6
+Storing file file3.txt to Dstore 2333
+Message received from port 2333: ACK
+ACK received from Dstore 2333 to store file file3.txt
+Store of file file3.txt to Dstore 2333 successfully completed
+Connection established to port 2335
+Message sent to port 2335: STORE file3.txt 6
+Storing file file3.txt to Dstore 2335
+Message received from port 2335: ACK
+ACK received from Dstore 2335 to store file file3.txt
+Store of file file3.txt to Dstore 2335 successfully completed
+Message received from port 12345: STORE_COMPLETE
+Store operation for file file3.txt completed
+Message sent to port 12345: LIST
+List operation started
+Message received from port 12345: LIST file3.txt file1.txt
+List operation successfully completed
+Message sent to port 12345: STORE file4.txt 6
+Store operation started for file file4.txt
+Message received from port 12345: STORE_TO 2336 2333 2335
+Controller replied to store file4.txt in these Dstores: 2336 2333 2335 
+Connection established to port 2336
+Message sent to port 2336: STORE file4.txt 6
+Storing file file4.txt to Dstore 2336
+Message received from port 2336: ACK
+ACK received from Dstore 2336 to store file file4.txt
+Store of file file4.txt to Dstore 2336 successfully completed
+Connection established to port 2333
+Message sent to port 2333: STORE file4.txt 6
+Storing file file4.txt to Dstore 2333
+Message received from port 2333: ACK
+ACK received from Dstore 2333 to store file file4.txt
+Store of file file4.txt to Dstore 2333 successfully completed
+Connection established to port 2335
+Message sent to port 2335: STORE file4.txt 6
+Storing file file4.txt to Dstore 2335
+Message received from port 2335: ACK
+ACK received from Dstore 2335 to store file file4.txt
+Store of file file4.txt to Dstore 2335 successfully completed
+Message received from port 12345: STORE_COMPLETE
+Store operation for file file4.txt completed
+Message sent to port 12345: LIST
+List operation started
+Message received from port 12345: LIST file4.txt file3.txt file1.txt
+List operation successfully completed
+Message sent to port 12345: STORE file2.txt 6
+Store operation started for file file2.txt
+Message received from port 12345: STORE_TO 2336 2333 2335
+Controller replied to store file2.txt in these Dstores: 2336 2333 2335 
+Connection established to port 2336
+Message sent to port 2336: STORE file2.txt 6
+Storing file file2.txt to Dstore 2336
+Message received from port 2336: ACK
+ACK received from Dstore 2336 to store file file2.txt
+Store of file file2.txt to Dstore 2336 successfully completed
+Connection established to port 2333
+Message sent to port 2333: STORE file2.txt 6
+Storing file file2.txt to Dstore 2333
+Message received from port 2333: ACK
+ACK received from Dstore 2333 to store file file2.txt
+Store of file file2.txt to Dstore 2333 successfully completed
+Connection established to port 2335
+Message sent to port 2335: STORE file2.txt 6
+Storing file file2.txt to Dstore 2335
+Message received from port 2335: ACK
+ACK received from Dstore 2335 to store file file2.txt
+Store of file file2.txt to Dstore 2335 successfully completed
+Message received from port 12345: STORE_COMPLETE
+Store operation for file file2.txt completed
+Message sent to port 12345: LIST
+List operation started
+Message received from port 12345: LIST file2.txt file4.txt file3.txt file1.txt
+List operation successfully completed
+Message sent to port 12345: STORE small_file.jpg 4849
+Store operation started for file small_file.jpg
+Message received from port 12345: STORE_TO 2336 2333 2335
+Controller replied to store small_file.jpg in these Dstores: 2336 2333 2335 
+Connection established to port 2336
+Message sent to port 2336: STORE small_file.jpg 4849
+Storing file small_file.jpg to Dstore 2336
+Message received from port 2336: ACK
+ACK received from Dstore 2336 to store file small_file.jpg
+Store of file small_file.jpg to Dstore 2336 successfully completed
+Connection established to port 2333
+Message sent to port 2333: STORE small_file.jpg 4849
+Storing file small_file.jpg to Dstore 2333
+Message received from port 2333: ACK
+ACK received from Dstore 2333 to store file small_file.jpg
+Store of file small_file.jpg to Dstore 2333 successfully completed
+Connection established to port 2335
+Message sent to port 2335: STORE small_file.jpg 4849
+Storing file small_file.jpg to Dstore 2335
+Message received from port 2335: ACK
+ACK received from Dstore 2335 to store file small_file.jpg
+Store of file small_file.jpg to Dstore 2335 successfully completed
+Message received from port 12345: STORE_COMPLETE
+Store operation for file small_file.jpg completed
+Connection established to port 12345
+Connection established to port 12345
+Message sent to port 12345: STORE file3.txt 6
+Store operation started for file file3.txt
+Message sent to port 12345: STORE small_file.jpg 4849
+Store operation started for file small_file.jpg
+Message received from port 12345: ERROR_FILE_ALREADY_EXISTS
+File to store file3.txt already exists in the data store
+Message received from port 12345: ERROR_FILE_ALREADY_EXISTS
+File to store small_file.jpg already exists in the data store
+Message sent to port 12345: STORE file4.txt 6
+Store operation started for file file4.txt
+Message sent to port 12345: STORE file2.txt 6
+Store operation started for file file2.txt
+Message received from port 12345: ERROR_FILE_ALREADY_EXISTS
+File to store file4.txt already exists in the data store
+Message received from port 12345: ERROR_FILE_ALREADY_EXISTS
+File to store file2.txt already exists in the data store
+Message sent to port 12345: STORE file5.txt 6
+Message sent to port 12345: STORE file5.txt 6
+Store operation started for file file5.txt
+Store operation started for file file5.txt
+Message received from port 12345: ERROR_FILE_ALREADY_EXISTS
+Message received from port 12345: STORE_TO 2336 2333 2335
+File to store file5.txt already exists in the data store
+Controller replied to store file5.txt in these Dstores: 2336 2333 2335 
+Message sent to port 12345: LIST
+List operation started
+Connection established to port 2336
+Message sent to port 2336: STORE file5.txt 6
+Storing file file5.txt to Dstore 2336
+Message received from port 12345: LIST small_file.jpg file2.txt file4.txt file3.txt file1.txt
+List operation successfully completed
+Message received from port 2336: ACK
+ACK received from Dstore 2336 to store file file5.txt
+Store of file file5.txt to Dstore 2336 successfully completed
+Connection established to port 2333
+Message sent to port 2333: STORE file5.txt 6
+Storing file file5.txt to Dstore 2333
+Message received from port 2333: ACK
+ACK received from Dstore 2333 to store file file5.txt
+Store of file file5.txt to Dstore 2333 successfully completed
+Connection established to port 2335
+Message sent to port 2335: STORE file5.txt 6
+Storing file file5.txt to Dstore 2335
+Message received from port 2335: ACK
+ACK received from Dstore 2335 to store file file5.txt
+Store of file file5.txt to Dstore 2335 successfully completed
+Message received from port 12345: STORE_COMPLETE
+Store operation for file file5.txt completed
+Message sent to port 12345: LIST
+List operation started
+Message received from port 12345: LIST small_file.jpg file2.txt file4.txt file3.txt file1.txt file5.txt
+List operation successfully completed
+Message sent to port 12345: REMOVE file4.txt
+Message sent to port 12345: REMOVE file5.txt
+Remove operation for file file5.txt started
+Remove operation for file file4.txt started
+Message received from port 12345: REMOVE_COMPLETE
+Remove operation for file file4.txt successfully completed
+Message sent to port 12345: LIST
+List operation started
+Message received from port 12345: REMOVE_COMPLETE
+Remove operation for file file5.txt successfully completed
+Message sent to port 12345: LIST
+List operation started
+Message received from port 12345: LIST small_file.jpg file2.txt file3.txt file1.txt
+List operation successfully completed
+Message received from port 12345: LIST small_file.jpg file2.txt file3.txt file1.txt
+List operation successfully completed

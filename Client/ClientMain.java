@@ -60,9 +60,7 @@ public class ClientMain {
 //			}).start();
         // testClientConnection(client,i);
 
-        for (int i = 0; i < 2; i++) {
-            new Thread(() -> test2Client(cport, timeout, downloadFolder, uploadFolder)).start();
-        }
+
 
 
 
@@ -73,12 +71,16 @@ public class ClientMain {
         client.list();
         client.store(new File(uploadFolder + "/" + "file3.txt"));
         client.list();
+        System.out.println("KILL NOW !!!");
+        Thread.sleep(10000);
         client.store(new File(uploadFolder + "/" + "file4.txt"));
         client.list();
         client.store(new File(uploadFolder + "/" + "file2.txt"));
         client.list();
         client.store(new File(uploadFolder + "/" + "small_file.jpg"));
-
+        for (int i = 0; i < 2; i++) {
+            new Thread(() -> test2Client(cport, timeout, downloadFolder, uploadFolder)).start();
+        }
 
 //
 //		testLoad(client);
