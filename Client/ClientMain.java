@@ -69,16 +69,16 @@ public class ClientMain {
 
         /// My tests :
 //
-//        testStore(client, uploadFolder);
-//        client.list();
-//        client.store(new File(uploadFolder + "/" + "file3.txt"));
-//        client.list();
-//        client.store(new File(uploadFolder + "/" + "file4.txt"));
-//        client.list();
-//        client.store(new File(uploadFolder + "/" + "file2.txt"));
-//        client.list();
-//        client.store(new File(uploadFolder + "/" + "small_file.jpg"));
-//
+        testStore(client, uploadFolder);
+        client.list();
+        client.store(new File(uploadFolder + "/" + "file3.txt"));
+        client.list();
+        client.store(new File(uploadFolder + "/" + "file4.txt"));
+        client.list();
+        client.store(new File(uploadFolder + "/" + "file2.txt"));
+        client.list();
+        client.store(new File(uploadFolder + "/" + "small_file.jpg"));
+
 
 //
 //		testLoad(client);

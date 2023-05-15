@@ -173,22 +173,25 @@ public class Controller {
         switch (splittedMessage[0]) {
 
             case Protocol.STORE_TOKEN -> {
-                if (Objects.equals(index.get(splittedMessage[1]), "REMOVE_IN_PROGRESS") || Objects.equals(index.get(splittedMessage[1]), "STORE_COMPLETED") || Objects.equals(index.get(splittedMessage[1]), "STORE_IN_PROGRESS")) {
+                // if (Objects.equals(index.get(splittedMessage[1]), "REMOVE_IN_PROGRESS") || Objects.equals(index.get(splittedMessage[1]), "STORE_COMPLETED") || Objects.equals(index.get(splittedMessage[1]), "STORE_IN_PROGRESS") || (storeLatchMap.putIfAbsent(splittedMessage[1], new CountDownLatch(R)) != null) ) {
+                if((index.containsKey(splittedMessage[1]) && index.get(splittedMessage[1]) != null) || index.containsKey(splittedMessage[1]) || storeLatchMap.putIfAbsent(splittedMessage[1], new CountDownLatch(R)) != null ) {
                     communicator.sendMessage(connection, Protocol.ERROR_FILE_ALREADY_EXISTS_TOKEN);
                 } else {
                     index.put(splittedMessage[1], "STORE_IN_PROGRESS");
-                    storeLatchMap.put(splittedMessage[1],new CountDownLatch(R));
+                    // storeLatchMap.put(splittedMessage[1],new CountDownLatch(R));
                     // handle store in another method
                     handleStore(connection, splittedMessage);
                     // once all ACK messages are received , we know for sure that the stored is completed ,so we modify the index
                     try {
                         if (storeLatchMap.get(splittedMessage[1]).await(timeout, TimeUnit.MILLISECONDS)) {
                             index.put(splittedMessage[1], "STORE_COMPLETED");
+                            storeLatchMap.remove(splittedMessage[1]);
                             fileSizeMap.put(splittedMessage[1], splittedMessage[2]);
                             communicator.sendMessage(connection, Protocol.STORE_COMPLETE_TOKEN);
                         } else {
                             System.out.println("-> ERROR SYSTEM TIMEOUT : WAITING ALL ACK FROM DSTORES");
                             index.remove(splittedMessage[1]);
+                            storeLatchMap.remove(splittedMessage[1]);
                             // TODO : what if the file don't exist as a key to be removed
                             try {
                                 fileDistributionInDstoresMap.remove(splittedMessage[1]);
@@ -212,9 +215,20 @@ public class Controller {
             }
 
             case Protocol.REMOVE_TOKEN -> {
-                if (index.containsKey(splittedMessage[1]) && ( !Objects.equals(index.get(splittedMessage[1]), "REMOVE_IN_PROGRESS") || index.get(splittedMessage[1]) == null || Objects.equals(index.get(splittedMessage[1]), "")) ) {
+
+                 if (index.containsKey(splittedMessage[1]) && Objects.equals(index.get(splittedMessage[1]), "STORE_COMPLETED") && removeLatchMap.putIfAbsent(splittedMessage[1], new CountDownLatch(R)) == null ) {
+                // if (index.containsKey(splittedMessage[1]) && (removeLatchMap.putIfAbsent(splittedMessage[1], new CountDownLatch(R)) != null)  || index.get(splittedMessage[1]) == null || Objects.equals(index.get(splittedMessage[1]), "")) ) {
+                    // If a different thread is also removing at the same time, it may be here by the time you check for "REMOVE_IN_PROGRESS",
+                    // and you will have 2 remove operations simultaneously on the same file. this is more of a problem with store.
+                    // can solve this by doing this:
+
+                    /*
+                   index.putIfAbsent to chekc and put same time
+                     */
+                    //                 if (index.containsKey(splittedMessage[1]) && ( !Objects.equals(index.get(splittedMessage[1]), "REMOVE_IN_PROGRESS") || index.get(splittedMessage[1]) == null || Objects.equals(index.get(splittedMessage[1]), "")) ) {
+
                     index.put(splittedMessage[1], "REMOVE_IN_PROGRESS");
-                    removeLatchMap.put(splittedMessage[1],new CountDownLatch(R));
+                    // removeLatchMap.put(splittedMessage[1],new CountDownLatch(R));
                     for (Socket eachDstoreConnection : dstoresConnectionsList) {
                         // send only to the connections that contains the files
                         if (fileDistributionInDstoresMap.get(splittedMessage[1]).contains(dstoresPortsEquivalent.get(eachDstoreConnection.getPort()))) {
@@ -226,11 +240,13 @@ public class Controller {
                                 //&& fileDistributionInDstoresMap.get(splittedMessage[1]).size() == 0)
                             // TODO : should I put "remove_competed" ?
                             index.remove(splittedMessage[1]);
+                            removeLatchMap.remove(splittedMessage[1]);
                             fileSizeMap.remove(splittedMessage[1]);
                             fileDistributionInDstoresMap.remove(splittedMessage[1]);
                             communicator.sendMessage(connection, Protocol.REMOVE_COMPLETE_TOKEN);
                             communicator.displaySentMessage(connection, "LIST SENT");
                         } else {
+                            removeLatchMap.remove(splittedMessage[1]);
                             System.out.println("-> ERROR TIMEOUT : THE FILE WAS NOT REMOVED SUCCESFULLY");
                         }
                     } catch (InterruptedException e) {
