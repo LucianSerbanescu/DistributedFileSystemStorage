@@ -213,8 +213,8 @@ public class Controller {
 
             case Protocol.REMOVE_TOKEN -> {
                 if (index.containsKey(splittedMessage[1]) && ( !Objects.equals(index.get(splittedMessage[1]), "REMOVE_IN_PROGRESS") || index.get(splittedMessage[1]) == null || Objects.equals(index.get(splittedMessage[1]), "")) ) {
-                    removeLatchMap.put(splittedMessage[1],new CountDownLatch(R));
                     index.put(splittedMessage[1], "REMOVE_IN_PROGRESS");
+                    removeLatchMap.put(splittedMessage[1],new CountDownLatch(R));
                     for (Socket eachDstoreConnection : dstoresConnectionsList) {
                         // send only to the connections that contains the files
                         if (fileDistributionInDstoresMap.get(splittedMessage[1]).contains(dstoresPortsEquivalent.get(eachDstoreConnection.getPort()))) {
