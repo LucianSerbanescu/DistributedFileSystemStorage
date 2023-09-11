@@ -1,1 +1,0 @@
-Client main store file test
